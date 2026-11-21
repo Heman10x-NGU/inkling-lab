@@ -1,0 +1,22 @@
+# Model files and the llama.cpp checkouts are fetched and built locally (see README).
+models/
+runtime/
+work/
+
+# Large binary outputs: stored baseline probabilities, captured states, adapter files.
+eval/*.bin
+results/**/*.gguf
+results/**/*.bin
+results/loops/*.bin
+
+# Raw per-node profiler dumps (about 7 MB each); the tables are in notes/metal_profile.md.
+results/metal_profile_*.json
+results/evalcb.out
+results/tmp.err
+
+# The model's chat template ships with the model file, not with this repo.
+eval/chat_template.jinja
+
+__pycache__/
+*.pyc
+.DS_Store
