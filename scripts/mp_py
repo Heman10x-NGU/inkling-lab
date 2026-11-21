@@ -1,0 +1,4 @@
+#!/bin/zsh
+# run python with numpy and the llama-loops gguf-py
+LAB=${INKLING_LAB:-$(cd "$(dirname "$0")/.." && pwd)}
+exec uv run -q --with numpy --with $LAB/runtime/llama-loops/gguf-py python "$@"
