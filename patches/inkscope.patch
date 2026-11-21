@@ -1,0 +1,345 @@
+diff --git a/common/debug.cpp b/common/debug.cpp
+index 102c6924d..01aa3329b 100644
+--- a/common/debug.cpp
++++ b/common/debug.cpp
+@@ -1,3 +1,6 @@
++#include <cstdlib>
++#include <cstdio>
++#include <cstring>
+ #include "debug.h"
+ 
+ #include "common.h"
+@@ -147,6 +150,30 @@ bool common_debug_cb_eval(struct ggml_tensor * t, bool ask, void * user_data) {
+     const struct ggml_tensor * src0 = t->src[0];
+     const struct ggml_tensor * src1 = t->src[1];
+ 
++    {
++        // INKSCOPE_DUMP=<file> INKSCOPE_NAMES=<regex>: write every tensor whose name matches, in full, and skip printing
++        static const char * dump_path  = getenv("INKSCOPE_DUMP");
++        static const char * dump_names = getenv("INKSCOPE_NAMES");
++        if (dump_path) {
++            static const std::regex re(dump_names ? dump_names : "^l_out-");
++            const bool want = std::regex_search(t->name, re) && !ggml_is_quantized(t->type);
++            if (ask) {
++                return want;
++            }
++            if (want) {
++                static FILE * f = fopen(dump_path, "wb");
++                const size_t n = ggml_nbytes(t);
++                std::vector<uint8_t> buf(n);
++                ggml_backend_tensor_get(t, buf.data(), 0, n);
++                char name[64] = {0};
++                strncpy(name, t->name, 63);
++                int64_t hdr[6] = {(int64_t) t->type, t->ne[0], t->ne[1], t->ne[2], t->ne[3], (int64_t) n};
++                fwrite(name, 1, 64, f); fwrite(hdr, sizeof(int64_t), 6, f); fwrite(buf.data(), 1, n, f); fflush(f);
++            }
++            return true;
++        }
++    }
++
+     if (ask) {
+         return true;  // Always retrieve data
+     }
+diff --git a/src/models/inkling2.cpp b/src/models/inkling2.cpp
+index 6a7a27da7..f349e6317 100644
+--- a/src/models/inkling2.cpp
++++ b/src/models/inkling2.cpp
+@@ -1,3 +1,4 @@
++#include <cstdlib>
+ #include "models.h"
+ #include "../llama-memory-hybrid-iswa.h"
+ 
+@@ -321,6 +322,14 @@ llama_model_inkling2::graph::graph(const llm_graph_params & params) : llm_graph_
+         if (n_loop_core > 0 && ip >= (int) hparams.loop_core_start && ip < (int) hparams.loop_core_end) {
+             const int pass = (il - (int) hparams.loop_core_start)/n_loop_core;
+ 
++            // experiment: skip whole passes of the looped core (bit p set => skip pass p, p >= 1)
++            {
++                static const int skip_mask = getenv("INKLING_SKIP_PASSES") ? atoi(getenv("INKLING_SKIP_PASSES")) : 0;
++                if (pass > 0 && (skip_mask & (1 << pass))) {
++                    continue;
++                }
++            }
++
+             if (ip == (int) hparams.loop_core_start) {
+                 if (pass == 0) {
+                     prelude_blocks = blocks;
+@@ -442,6 +451,7 @@ llama_model_inkling2::graph::graph(const llm_graph_params & params) : llm_graph_
+                     Qcur, Kcur, Vcur, kq_b, sinks, 1.0f/sqrtf(n_embd_head), il);
+ 
+             cur = ggml_mul(ctx0, cur, ggml_sigmoid(ctx0, build_lora_mm(layer.wqkv_gate, inputs[0])));
++            cb(cur, "wo_inp", il); // input of the attention output projection (gated head outputs)
+             cur = convolve(build_lora_mm(layer.wo, cur), layer.attn_post_conv, nullptr, state, history, recr, 2*n_embd_k_gqa);
+             cb(cur, "attn_out", il);
+         }
+@@ -484,6 +494,11 @@ llama_model_inkling2::graph::graph(const llm_graph_params & params) : llm_graph_
+ 
+         cur = ggml_add(ctx0, ffn_inp, cur);
+         cb(cur, "l_out", il);
++
++        // experiment: name the block sum this pass hands forward so it can be captured
++        if (n_loop_core > 0 && ip == (int) hparams.loop_core_end - 1 && !blocks.empty()) {
++            cb(blocks.back(), "pass_block", il);
++        }
+     }
+ 
+     cur = ggml_reshape_2d(ctx0, mix(blocks, cur, model.output_res_query), n_embd, n_tokens);
+diff --git a/tools/CMakeLists.txt b/tools/CMakeLists.txt
+index 57d53df25..487e1db62 100644
+--- a/tools/CMakeLists.txt
++++ b/tools/CMakeLists.txt
+@@ -20,6 +20,7 @@ else()
+     add_subdirectory(llama-bench)
+     add_subdirectory(completion)
+     add_subdirectory(perplexity)
++    add_subdirectory(inkscope)
+     add_subdirectory(quantize)
+     if (LLAMA_BUILD_SERVER)
+         # the chat app lives in ui/apps/chat, outside tools/
+diff --git a/tools/inkscope/CMakeLists.txt b/tools/inkscope/CMakeLists.txt
+new file mode 100644
+index 000000000..091aca401
+--- /dev/null
++++ b/tools/inkscope/CMakeLists.txt
+@@ -0,0 +1,5 @@
++set(TARGET llama-inkscope)
++add_executable(${TARGET} inkscope.cpp)
++target_include_directories(${TARGET} PRIVATE ${PROJECT_SOURCE_DIR}/vendor)
++target_link_libraries(${TARGET} PRIVATE llama-common llama ${CMAKE_THREAD_LIBS_INIT})
++target_compile_features(${TARGET} PRIVATE cxx_std_17)
+diff --git a/tools/inkscope/inkscope.cpp b/tools/inkscope/inkscope.cpp
+new file mode 100644
+index 000000000..2aeeb9fa9
+--- /dev/null
++++ b/tools/inkscope/inkscope.cpp
+@@ -0,0 +1,230 @@
++// inkscope: load a model once, run many prompts, capture named activations, optional LoRA adapters
++//
++// usage: llama-inkscope -m model.gguf -ngl 99 -c 2048 [--lora a.gguf ...] \
++//            --prompts prompts.jsonl --out dir [--names REGEX] [--last-n K] [--generate N]
++//
++// each line of prompts.jsonl is {"id": "...", "prompt": "..."}; special tokens are parsed
++// per prompt: <out>/<id>.bin (records: 64-byte name, int64 type, ne0..ne3, nbytes, raw data)
++//             <out>/<id>.json (token ids, top-5 next tokens at the last position, greedy continuation)
++
++#include "arg.h"
++#include "common.h"
++#include "log.h"
++#include "llama.h"
++#include "ggml-backend.h"
++
++#include <nlohmann/json.hpp>
++
++#include <algorithm>
++#include <clocale>
++#include <cmath>
++#include <cstdio>
++#include <cstring>
++#include <fstream>
++#include <regex>
++#include <string>
++#include <vector>
++
++using json = nlohmann::ordered_json;
++
++struct scope_state {
++    std::regex re;
++    bool       active = false; // only capture during the prompt decode
++    int64_t    last_n = 0;     // 0 = keep all token positions
++    FILE *     f      = nullptr;
++    int        n_rec  = 0;
++};
++
++static bool scope_cb(struct ggml_tensor * t, bool ask, void * user_data) {
++    auto * st = (scope_state *) user_data;
++    const bool want = st->active && st->f && !ggml_is_quantized(t->type) && std::regex_search(t->name, st->re);
++    if (ask) {
++        return want;
++    }
++    if (!want) {
++        return true;
++    }
++    if (!ggml_is_contiguous(t)) {
++        LOG_WRN("inkscope: skipping non-contiguous tensor %s\n", t->name);
++        return true;
++    }
++    const size_t n = ggml_nbytes(t);
++    std::vector<uint8_t> buf(n);
++    ggml_backend_tensor_get(t, buf.data(), 0, n);
++
++    int64_t ne[4] = {t->ne[0], t->ne[1], t->ne[2], t->ne[3]};
++    size_t off = 0, nb = n;
++    // 2-D tensors are [features, tokens]: keep only the last K token columns
++    if (st->last_n > 0 && ne[2] == 1 && ne[3] == 1 && ne[1] > st->last_n) {
++        const size_t row = t->nb[1];
++        off   = (size_t) (ne[1] - st->last_n) * row;
++        ne[1] = st->last_n;
++        nb    = (size_t) ne[1] * row;
++    }
++    char name[64] = {0};
++    strncpy(name, t->name, 63);
++    const int64_t hdr[6] = {(int64_t) t->type, ne[0], ne[1], ne[2], ne[3], (int64_t) nb};
++    fwrite(name, 1, 64, st->f);
++    fwrite(hdr, sizeof(int64_t), 6, st->f);
++    fwrite(buf.data() + off, 1, nb, st->f);
++    st->n_rec++;
++    return true;
++}
++
++// pull our own flags out of argv so common_params_parse sees only the common ones
++static bool take_flag(std::vector<char *> & args, const char * flag, std::string & value) {
++    for (size_t i = 1; i + 1 < args.size(); ++i) {
++        if (strcmp(args[i], flag) == 0) {
++            value = args[i + 1];
++            args.erase(args.begin() + i, args.begin() + i + 2);
++            return true;
++        }
++    }
++    return false;
++}
++
++int main(int argc, char ** argv) {
++    std::setlocale(LC_NUMERIC, "C");
++
++    std::vector<char *> args(argv, argv + argc);
++    std::string prompts_path, out_dir, names = "^result_norm$", last_n_s = "0", gen_s = "0";
++    take_flag(args, "--prompts", prompts_path);
++    take_flag(args, "--out", out_dir);
++    take_flag(args, "--names", names);
++    take_flag(args, "--last-n", last_n_s);
++    take_flag(args, "--generate", gen_s);
++    if (prompts_path.empty() || out_dir.empty()) {
++        fprintf(stderr, "usage: %s -m MODEL --prompts FILE.jsonl --out DIR [--names REGEX] [--last-n K] [--generate N] [--lora F]...\n", argv[0]);
++        return 1;
++    }
++
++    scope_state st;
++    st.re     = std::regex(names);
++    st.last_n = std::stoll(last_n_s);
++    const int n_gen = std::stoi(gen_s);
++
++    common_params params;
++    common_init();
++    int argc2 = (int) args.size();
++    if (!common_params_parse(argc2, args.data(), params, LLAMA_EXAMPLE_COMMON)) {
++        return 1;
++    }
++    if (params.n_batch > params.n_ctx && params.n_ctx > 0) {
++        params.n_batch = params.n_ctx;
++    }
++    params.n_ubatch = std::min(params.n_ubatch, params.n_batch);
++
++    llama_backend_init();
++    llama_numa_init(params.numa);
++
++    params.cb_eval           = scope_cb;
++    params.cb_eval_user_data = &st;
++    params.warmup            = false;
++
++    auto llama_init = common_init_from_params(params);
++    auto * model = llama_init->model();
++    auto * ctx   = llama_init->context();
++    if (model == nullptr || ctx == nullptr) {
++        LOG_ERR("%s : failed to init\n", __func__);
++        return 1;
++    }
++    const llama_vocab * vocab = llama_model_get_vocab(model);
++    const bool add_bos = llama_vocab_get_add_bos(vocab);
++
++    llama_token tok_end = LLAMA_TOKEN_NULL;
++    {
++        auto t = common_tokenize(vocab, "<|end_message|>", false, true);
++        if (t.size() == 1) {
++            tok_end = t[0];
++        }
++    }
++
++    std::ifstream in(prompts_path);
++    std::string line;
++    int n_done = 0;
++    while (std::getline(in, line)) {
++        if (line.empty()) {
++            continue;
++        }
++        const json j = json::parse(line);
++        const std::string id = j.at("id"), prompt = j.at("prompt");
++
++        std::vector<llama_token> tokens = common_tokenize(ctx, prompt, add_bos, true);
++        if (tokens.empty() || (int) tokens.size() > params.n_batch) {
++            LOG_ERR("inkscope: prompt %s has %zu tokens (batch %d), skipped\n", id.c_str(), tokens.size(), params.n_batch);
++            continue;
++        }
++
++        llama_memory_clear(llama_get_memory(ctx), true);
++
++        st.f     = fopen((out_dir + "/" + id + ".bin").c_str(), "wb");
++        st.n_rec = 0;
++        st.active = true;
++        common_batch batch = common_batch_get_one(ctx, tokens);
++        const int ret = llama_process(ctx, LLAMA_PROCESS_TYPE_DECODE, batch.get());
++        llama_synchronize(ctx);
++        st.active = false;
++        fclose(st.f);
++        st.f = nullptr;
++        if (ret != 0) {
++            LOG_ERR("inkscope: decode failed for %s (%d)\n", id.c_str(), ret);
++            continue;
++        }
++
++        const int n_vocab = llama_vocab_n_tokens(vocab);
++        const float * logits = llama_get_logits_ith(ctx, -1);
++        std::vector<std::pair<float, int>> lp;
++        float mx = -INFINITY;
++        for (int i = 0; i < n_vocab; ++i) mx = std::max(mx, logits[i]);
++        double z = 0;
++        for (int i = 0; i < n_vocab; ++i) z += std::exp((double) logits[i] - mx);
++        for (int i = 0; i < n_vocab; ++i) lp.push_back({logits[i], i});
++        std::partial_sort(lp.begin(), lp.begin() + 5, lp.end(), [](auto & a, auto & b) { return a.first > b.first; });
++
++        json out;
++        out["id"] = id;
++        out["tokens"] = tokens;
++        out["n_records"] = st.n_rec;
++        json top = json::array();
++        for (int k = 0; k < 5; ++k) {
++            top.push_back({{"id", lp[k].second},
++                           {"piece", common_token_to_piece(ctx, lp[k].second, true)},
++                           {"logit", lp[k].first},
++                           {"p", std::exp((double) lp[k].first - mx) / z}});
++        }
++        out["top5"] = top;
++
++        if (n_gen > 0) {
++            std::string text;
++            std::vector<llama_token> gen;
++            llama_token cur = lp[0].second;
++            for (int s = 0; s < n_gen; ++s) {
++                if (cur == tok_end) {
++                    break;
++                }
++                gen.push_back(cur);
++                text += common_token_to_piece(ctx, cur, true);
++                if (s + 1 == n_gen) {
++                    break;
++                }
++                std::vector<llama_token> one = {cur};
++                common_batch b1 = common_batch_get_one(ctx, one);
++                if (llama_process(ctx, LLAMA_PROCESS_TYPE_DECODE, b1.get()) != 0) {
++                    LOG_ERR("inkscope: generation decode failed for %s\n", id.c_str());
++                    break;
++                }
++                const float * lg = llama_get_logits_ith(ctx, -1);
++                cur = (llama_token) (std::max_element(lg, lg + n_vocab) - lg);
++            }
++            out["gen_tokens"] = gen;
++            out["generated"] = text;
++        }
++
++        std::ofstream(out_dir + "/" + id + ".json") << out.dump(1, ' ', false, json::error_handler_t::replace) << "\n"; // generated text can hold split UTF-8
++        n_done++;
++    }
++    LOG_INF("inkscope: %d prompts done\n", n_done);
++
++    llama_backend_free();
++    return 0;
++}
