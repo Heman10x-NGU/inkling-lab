@@ -1,0 +1,2055 @@
+#include "models.h"
+#include "../llama-memory-hybrid-iswa.h"
+
+void llama_model_inkling2::load_arch_hparams(llama_model_loader & ml) {
+    ml.get_key(LLM_KV_ATTENTION_LAYERNORM_RMS_EPS, hparams.f_norm_rms_eps);
+    ml.get_key(LLM_KV_ATTENTION_QK_CLIP,           hparams.f_qk_clip);
+    ml.get_key(LLM_KV_ATTN_RES_BLOCK_SIZE,         hparams.attn_res_block_size);
+    ml.get_key(LLM_KV_SHORTCONV_L_CACHE,           hparams.n_shortconv_l_cache);
+
+    // relative-position bias, and the log-scaled positions of the full-attention layers
+    ml.get_key(LLM_KV_ATTENTION_RELATIVE_LENGTH, hparams.n_relative);
+    ml.get_key(LLM_KV_ATTENTION_RELATIVE_EXTENT, hparams.n_relative_extent);
+    ml.get_key(LLM_KV_ATTENTION_RELATIVE_CLIP,   hparams.f_relative_clip);
+    ml.get_key(LLM_KV_ATTENTION_LOG_SCALE_FLOOR, hparams.n_log_scale_floor);
+    ml.get_key(LLM_KV_ATTENTION_LOG_SCALE_ALPHA, hparams.f_log_scale_alpha);
+
+    // the embedding and output tensors are padded past the vocabulary
+    ml.get_key(LLM_KV_VOCAB_SIZE,          hparams.n_vocab_padded);
+    ml.get_key(LLM_KV_VOCAB_SIZE_UNPADDED, hparams.n_vocab_unpadded);
+
+    // MoE
+    ml.get_key_or_arr(LLM_KV_EXPERT_FEED_FORWARD_LENGTH, hparams.n_ff_exp_arr, hparams.n_layer_all);
+
+    ml.get_key(LLM_KV_ACTIVATION_SITU_BETA,        hparams.situ_beta);
+    ml.get_key(LLM_KV_ACTIVATION_SITU_LINEAR_BETA, hparams.situ_linear_beta);
+    ml.get_key(LLM_KV_EXPERT_WEIGHTS_SCALE,        hparams.expert_weights_scale, false);
+
+    hparams.f_final_logit_softcapping = 0.0f;
+    ml.get_key(LLM_KV_FINAL_LOGIT_SOFTCAPPING, hparams.f_final_logit_softcapping, false);
+
+    // sliding window
+    ml.get_key(LLM_KV_ATTENTION_SLIDING_WINDOW,         hparams.n_swa);
+    ml.get_arr(LLM_KV_ATTENTION_SLIDING_WINDOW_PATTERN, hparams.is_swa_impl);
+
+    uint32_t n_pattern = 0;
+    ml.get_arr_n(LLM_KV_ATTENTION_SLIDING_WINDOW_PATTERN, n_pattern);
+
+    if (n_pattern != hparams.n_layer() || !hparams.n_relative || !hparams.n_relative_extent || !hparams.n_swa ||
+        !hparams.attn_res_block_size || !hparams.n_log_scale_floor || hparams.n_shortconv_l_cache < 2 ||
+        hparams.n_shortconv_l_cache > 64 || hparams.n_relative_extent > INT32_MAX || hparams.n_swa > INT32_MAX ||
+        !hparams.n_vocab_unpadded || hparams.n_vocab_unpadded > hparams.n_vocab_padded) {
+        throw std::runtime_error("inkling2: invalid dimensions, vocabulary, or layer pattern");
+    }
+
+    for (float value : {hparams.f_norm_rms_eps, hparams.f_qk_clip, hparams.f_relative_clip, hparams.situ_beta, hparams.situ_linear_beta}) {
+        if (!std::isfinite(value) || value <= 0.0f) {
+            throw std::runtime_error("inkling2: normalization, clipping and scaling parameters must be finite and positive");
+        }
+    }
+
+    if (!std::isfinite(hparams.f_log_scale_alpha) || hparams.f_log_scale_alpha < 0.0f) {
+        throw std::runtime_error("inkling2: invalid logarithmic scale");
+    }
+
+    if (hparams.loop_n_pass > 1) {
+        ml.get_key(LLM_KV_LOOP_GATE_RANK, hparams.loop_gate_rank);
+        if (!hparams.loop_core_start || !hparams.loop_gate_rank || hparams.loop_core_start % hparams.attn_res_block_size ||
+            (hparams.loop_core_end - hparams.loop_core_start) % hparams.attn_res_block_size) {
+            throw std::runtime_error("inkling2: the looped core must start after the first block and span whole blocks");
+        }
+    }
+
+    hparams.swa_type                = LLAMA_SWA_TYPE_STANDARD;
+    hparams.expert_router_f32       = true;
+    hparams.expert_weights_norm_eps = 1e-20f;
+
+    // no RoPE, the relative-position bias carries the positions
+    hparams.rope_pattern.fill(false);
+
+    // the convolution state keeps K, V, the attention output and the FFN output of the widest layer
+    uint64_t n_channels_max = 0;
+
+    for (uint32_t il = 0; il < hparams.n_layer(); ++il) {
+        if (!hparams.n_head_kv(il) || hparams.n_head(il) % hparams.n_head_kv(il) ||
+            hparams.n_embd_head_k(il) != hparams.n_embd_head_v(il) || !hparams.n_expert_used(il) ||
+            hparams.n_expert_used(il) > hparams.n_expert || !hparams.n_ff_exp(il)) {
+            throw std::runtime_error("inkling2: invalid attention or expert dimensions");
+        }
+
+        n_channels_max = std::max<uint64_t>(n_channels_max, 2ull * hparams.n_embd_k_gqa(il) + 2ull * hparams.n_embd);
+    }
+
+    if (n_channels_max * (hparams.n_shortconv_l_cache - 1) > UINT32_MAX) {
+        throw std::runtime_error("inkling2: convolution state is too large");
+    }
+
+    hparams.n_sconv_channels = n_channels_max;
+
+    type = LLM_TYPE_UNKNOWN;
+}
+
+void llama_model_inkling2::load_arch_tensors(llama_model_loader &) {
+    LLAMA_LOAD_LOCALS;
+
+    if (hparams.n_vocab_unpadded != vocab.n_tokens()) {
+        throw std::runtime_error("inkling2: tokenizer size must equal the unpadded vocabulary size");
+    }
+
+    const int64_t n_vocab_padded = hparams.n_vocab_padded;
+    const int64_t n_rel          = hparams.n_relative;
+    const int64_t n_conv         = hparams.n_shortconv_l_cache;
+
+    tok_embd = create_tensor(tn(LLM_TENSOR_TOKEN_EMBD,      "weight"),    {n_embd, n_vocab_padded}, 0);
+    tok_norm = create_tensor(tn(LLM_TENSOR_TOKEN_EMBD_NORM, "weight", 0), {n_embd}, 0);
+
+    // output
+    output           = create_tensor(tn(LLM_TENSOR_OUTPUT,           "weight"), {n_embd, n_vocab_padded}, 0);
+    output_norm      = create_tensor(tn(LLM_TENSOR_OUTPUT_NORM,      "weight"), {n_embd}, 0);
+    output_res_query = create_tensor(tn(LLM_TENSOR_OUTPUT_RES_QUERY, "weight"), {n_embd}, 0);
+
+    const bool loop = hparams.loop_n_pass > 1;
+
+    for (int i = 0; i < n_layer - (int) hparams.loop_n_extra(); ++i) {
+        auto & layer = layers[i];
+
+        const int iv = hparams.loop_visit(i);
+
+        const int64_t n_head      = hparams.n_head(iv);
+        const int64_t n_head_kv   = hparams.n_head_kv(iv);
+        const int64_t n_embd_head = hparams.n_embd_head_k(iv);
+        const int64_t n_ff_exp    = hparams.n_ff_exp(iv);
+        const int64_t n_extent    = hparams.is_swa(iv) ? hparams.n_swa : hparams.n_relative_extent;
+
+        // attention
+        layer.wq        = create_tensor(tn(LLM_TENSOR_ATTN_Q,    "weight", i), {n_embd, n_embd_head*n_head}, 0);
+        layer.wk        = create_tensor(tn(LLM_TENSOR_ATTN_K,    "weight", i), {n_embd, n_embd_head*n_head_kv}, 0);
+        layer.wv        = create_tensor(tn(LLM_TENSOR_ATTN_V,    "weight", i), {n_embd, n_embd_head*n_head_kv}, 0);
+        layer.wo        = create_tensor(tn(LLM_TENSOR_ATTN_OUT,  "weight", i), {n_embd_head*n_head, n_embd}, 0);
+        layer.wqkv_gate = create_tensor(tn(LLM_TENSOR_ATTN_GATE, "weight", i), {n_embd, n_embd_head*n_head}, 0);
+
+        layer.attn_q_clip    = create_tensor(tn(LLM_TENSOR_ATTN_Q_CLIP,    "weight", i), {n_embd_head, n_head}, 0);
+        layer.attn_sink_proj = create_tensor(tn(LLM_TENSOR_ATTN_SINK_PROJ, "weight", i), {n_embd, n_head}, 0);
+
+        // relative-position bias
+        layer.attn_rel      = create_tensor(tn(LLM_TENSOR_ATTN_REL,      "weight", i), {n_embd, n_rel*n_head}, 0);
+        layer.attn_rel_bias = create_tensor(tn(LLM_TENSOR_ATTN_REL_BIAS, "weight", i), {n_rel, n_extent}, 0);
+        layer.attn_rel_clip = create_tensor(tn(LLM_TENSOR_ATTN_REL_CLIP, "weight", i), {n_rel, n_head}, 0);
+
+        // short convolutions
+        layer.attn_k_conv    = create_tensor(tn(LLM_TENSOR_ATTN_K_CONV,    "weight", i), {n_conv, n_embd_head*n_head_kv}, 0);
+        layer.attn_v_conv    = create_tensor(tn(LLM_TENSOR_ATTN_V_CONV,    "weight", i), {n_conv, n_embd_head*n_head_kv}, 0);
+        layer.attn_post_conv = create_tensor(tn(LLM_TENSOR_ATTN_POST_CONV, "weight", i), {n_conv, n_embd}, 0);
+        layer.ffn_post_conv  = create_tensor(tn(LLM_TENSOR_FFN_POST_CONV,  "weight", i), {n_conv, n_embd}, 0);
+
+        if (hparams.is_swa(iv)) {
+            layer.attn_norm = create_tensor(tn(LLM_TENSOR_ATTN_NORM, "weight", i), {n_embd}, 0);
+        } else {
+            // full-attention layers: separate Q, K and V input norms, and input-dependent taps for the K and V convolutions
+            layer.attn_q_inp_norm  = create_tensor(tn(LLM_TENSOR_ATTN_Q_INP_NORM,  "weight", i), {n_embd}, 0);
+            layer.attn_k_inp_norm  = create_tensor(tn(LLM_TENSOR_ATTN_K_INP_NORM,  "weight", i), {n_embd}, 0);
+            layer.attn_v_inp_norm  = create_tensor(tn(LLM_TENSOR_ATTN_V_INP_NORM,  "weight", i), {n_embd}, 0);
+            layer.attn_k_conv_proj = create_tensor(tn(LLM_TENSOR_ATTN_K_CONV_PROJ, "weight", i), {n_embd, n_conv*n_head_kv}, 0);
+            layer.attn_v_conv_proj = create_tensor(tn(LLM_TENSOR_ATTN_V_CONV_PROJ, "weight", i), {n_embd, n_conv*n_head_kv}, 0);
+        }
+
+        // block attention residuals
+        if (i > 0) {
+            layer.attn_res_query = create_tensor(tn(LLM_TENSOR_ATTN_RES_QUERY, "weight", i), {n_embd, hparams.is_swa(iv) ? 1 : 3}, 0);
+        }
+        layer.ffn_res_query = create_tensor(tn(LLM_TENSOR_FFN_RES_QUERY, "weight", i), {n_embd}, 0);
+
+        // MoE
+        layer.ffn_norm         = create_tensor(tn(LLM_TENSOR_FFN_NORM,         "weight", i), {n_embd}, 0);
+        layer.ffn_gate_inp     = create_tensor(tn(LLM_TENSOR_FFN_GATE_INP,     "weight", i), {n_embd, n_expert}, 0);
+        layer.ffn_exp_probs_b  = create_tensor(tn(LLM_TENSOR_FFN_EXP_PROBS_B,  "bias",   i), {n_expert}, TENSOR_NOT_REQUIRED);
+        layer.ffn_gate_up_exps = create_tensor(tn(LLM_TENSOR_FFN_GATE_UP_EXPS, "weight", i), {n_embd, 2*n_ff_exp, n_expert}, 0);
+        layer.ffn_down_exps    = create_tensor(tn(LLM_TENSOR_FFN_DOWN_EXPS,    "weight", i), {n_ff_exp, n_embd, n_expert}, 0);
+
+        // message controllers of the looped core: (attn, k, v, mlp) x (down, gain, forget)
+        if (loop && i >= (int) hparams.loop_core_start && i < (int) hparams.loop_core_end) {
+            static const llm_tensor down[4]   = {LLM_TENSOR_LOOP_ATTN_DOWN,   LLM_TENSOR_LOOP_K_DOWN,   LLM_TENSOR_LOOP_V_DOWN,   LLM_TENSOR_LOOP_MLP_DOWN};
+            static const llm_tensor gain[4]   = {LLM_TENSOR_LOOP_ATTN_GAIN,   LLM_TENSOR_LOOP_K_GAIN,   LLM_TENSOR_LOOP_V_GAIN,   LLM_TENSOR_LOOP_MLP_GAIN};
+            static const llm_tensor forget[4] = {LLM_TENSOR_LOOP_ATTN_FORGET, LLM_TENSOR_LOOP_K_FORGET, LLM_TENSOR_LOOP_V_FORGET, LLM_TENSOR_LOOP_MLP_FORGET};
+
+            const int64_t n_rank = hparams.loop_gate_rank;
+
+            for (int m = 0; m < 4; ++m) {
+                layer.loop_down[m]   = create_tensor(tn(down[m],   "weight", i), {2*n_embd, n_rank}, 0);
+                layer.loop_gain[m]   = create_tensor(tn(gain[m],   "weight", i), {n_rank, n_embd}, 0);
+                layer.loop_forget[m] = create_tensor(tn(forget[m], "weight", i), {n_rank, n_embd}, 0);
+            }
+        }
+    }
+
+    if (loop) {
+        const int64_t n_query = 2*(hparams.loop_core_end - hparams.loop_core_start);
+
+        loop_res_query    = create_tensor(tn(LLM_TENSOR_LOOP_RES_QUERY,    "weight"), {n_embd, n_query}, 0);
+        loop_kv_res_query = create_tensor(tn(LLM_TENSOR_LOOP_KV_RES_QUERY, "weight"), {n_embd, n_query}, 0);
+    }
+}
+
+std::unique_ptr<llm_graph_context> llama_model_inkling2::build_arch_graph(const llm_graph_params & params) const {
+    return std::make_unique<graph>(params);
+}
+
+// scale each row down to an L2 norm of at most threshold, after the optional per-channel scale
+ggml_tensor * llama_model_inkling2::graph::clip(ggml_tensor * cur, ggml_tensor * scale, float threshold) {
+    if (scale) {
+        cur = ggml_mul(ctx0, cur, scale);
+    }
+
+    ggml_tensor * norm = ggml_sqrt(ctx0, ggml_sum_rows(ctx0, ggml_sqr(ctx0, cur)));
+    norm = ggml_scale_bias(ctx0, norm, 1.0f, 1e-6f);
+
+    ggml_tensor * factor = ggml_div(ctx0, ggml_fill(ctx0, norm, threshold), norm);
+
+    return ggml_mul(ctx0, cur, ggml_clamp(ctx0, factor, 0.0f, 1.0f));
+}
+
+// attention over the depth: mix the earlier block outputs and cur with learned queries
+ggml_tensor * llama_model_inkling2::graph::mix(const std::vector<ggml_tensor *> & blocks, ggml_tensor * cur, ggml_tensor * query) {
+    ggml_tensor * states = ggml_reshape_3d(ctx0, cur, n_embd, 1, n_tokens);
+    for (ggml_tensor * block : blocks) {
+        states = ggml_concat(ctx0, ggml_reshape_3d(ctx0, block, n_embd, 1, n_tokens), states, 1);
+    }
+    states = ggml_rms_norm(ctx0, states, 1e-6f);
+
+    ggml_tensor * queries = ggml_repeat(ctx0, query, ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, n_embd, query->ne[1], n_tokens));
+
+    ggml_tensor * scores = ggml_mul_mat(ctx0, states, queries);
+    scores = ggml_soft_max_ext(ctx0, scores, nullptr, 1.0f/sqrtf(n_embd), 0.0f);
+
+    return ggml_mul_mat(ctx0, ggml_cont(ctx0, ggml_transpose(ctx0, states)), scores);
+}
+
+// loop message controller: (1 - tanh(F h))*cur + tanh(G h)*message, h = D [rms(cur); rms(message)]; module: q, k, v, mlp
+ggml_tensor * llama_model_inkling2::graph::control(ggml_tensor * cur, ggml_tensor * message, const llama_layer & layer, int module) {
+    ggml_tensor * h = ggml_concat(ctx0, ggml_reshape_3d(ctx0, cur, n_embd, 1, n_tokens), ggml_reshape_3d(ctx0, message, n_embd, 1, n_tokens), 1);
+    h = ggml_reshape_2d(ctx0, ggml_rms_norm(ctx0, h, 1e-6f), 2*n_embd, n_tokens);
+    h = build_lora_mm(layer.loop_down[module], h);
+
+    ggml_tensor * gain   = ggml_tanh(ctx0, build_lora_mm(layer.loop_gain[module],   h));
+    ggml_tensor * forget = ggml_tanh(ctx0, build_lora_mm(layer.loop_forget[module], h));
+
+    return ggml_add(ctx0, ggml_mul(ctx0, ggml_scale_bias(ctx0, forget, -1.0f, 1.0f), cur), ggml_mul(ctx0, gain, message));
+}
+
+// causal short convolution with a residual; dynamic adds input-dependent taps per head
+// the last n_conv - 1 inputs of each sequence live in the recurrent state at channel offset `offset`
+ggml_tensor * llama_model_inkling2::graph::convolve(
+        ggml_tensor * cur,
+        ggml_tensor * weight,
+        ggml_tensor * dynamic,
+        ggml_tensor * state,
+        ggml_tensor * history,
+        llm_graph_input_rs * inp,
+        int64_t offset) {
+    const int64_t n_conv       = hparams.n_shortconv_l_cache;
+    const int64_t n_channels   = cur->ne[0];
+    const int64_t n_seq_tokens = ubatch.n_seq_tokens;
+    const int64_t n_seqs       = ubatch.n_seqs;
+
+    ggml_tensor * past = ggml_view_3d(ctx0, history, n_conv - 1, n_channels, n_seqs, history->nb[1], history->nb[2], offset*history->nb[1]);
+
+    ggml_tensor * x = ggml_transpose(ctx0, ggml_reshape_3d(ctx0, cur, n_channels, n_seq_tokens, n_seqs));
+    x = ggml_concat(ctx0, past, x, 0);
+
+    build_conv_state_store(inp, state, x, n_conv - 1, offset*(n_conv - 1)*ggml_element_size(state));
+
+    ggml_tensor * out = ggml_ssm_conv(ctx0, x, weight);
+    out = ggml_reshape_2d(ctx0, out, n_channels, n_tokens);
+
+    if (dynamic) {
+        const int64_t n_heads = dynamic->ne[0]/n_conv;
+
+        dynamic = ggml_reshape_3d(ctx0, dynamic, n_conv, n_heads, n_tokens);
+
+        for (int64_t lag = 0; lag < n_conv; ++lag) {
+            ggml_tensor * tap    = ggml_view_3d(ctx0, dynamic, 1, n_heads, n_tokens, dynamic->nb[1], dynamic->nb[2], lag*dynamic->nb[0]);
+            ggml_tensor * window = ggml_view_3d(ctx0, x, n_seq_tokens, n_channels, n_seqs, x->nb[1], x->nb[2], (n_conv - 1 - lag)*x->nb[0]);
+
+            window = ggml_cont(ctx0, ggml_transpose(ctx0, window));
+            window = ggml_reshape_3d(ctx0, window, n_channels/n_heads, n_heads, n_tokens);
+
+            ggml_tensor * term = ggml_reshape_2d(ctx0, ggml_mul(ctx0, window, tap), n_channels, n_tokens);
+
+            out = ggml_add(ctx0, out, term);
+        }
+    }
+
+    return ggml_scale(ctx0, ggml_add(ctx0, cur, out), 1.0f/sqrtf((dynamic ? 2 : 1)*n_conv + 1));
+}
+
+llama_model_inkling2::graph::graph(const llm_graph_params & params) : llm_graph_context(params) {
+    auto * inp  = build_inp_mem_hybrid_iswa_rel(hparams.n_relative_extent, hparams.n_swa);
+    auto * attn = inp->get_attn();
+    auto * recr = inp->get_recr();
+
+    ggml_tensor * inp_pos     = build_inp_pos();
+    ggml_tensor * inp_out_ids = build_inp_out_ids();
+
+    // log-scaled positions: 1 + alpha*log(max(1, (pos + 1)/floor)), multiplies q and r of the full-attention layers
+    ggml_tensor * tau = ggml_scale_bias(ctx0, ggml_cast(ctx0, inp_pos, GGML_TYPE_F32), 1.0f, 1.0f);
+    tau = ggml_log(ctx0, ggml_clamp(ctx0, ggml_scale(ctx0, tau, 1.0f/hparams.n_log_scale_floor), 1.0f, INFINITY));
+    tau = ggml_reshape_3d(ctx0, ggml_scale_bias(ctx0, tau, hparams.f_log_scale_alpha, 1.0f), 1, 1, n_tokens);
+
+    ggml_tensor * cur = build_inp_embd(model.tok_embd);
+
+    // important: do not normalize raw embeddings input (i.e. encoded image embeddings)
+    if (ubatch.token) {
+        cur = build_norm(cur, model.tok_norm, nullptr, LLM_NORM_RMS, -1);
+    }
+
+    std::vector<ggml_tensor *> blocks;
+
+    // each pass of the looped core restarts from the prelude state and reads the previous pass's blocks through messages
+    const int64_t n_loop_core = hparams.loop_n_pass > 1 ? hparams.loop_core_end - hparams.loop_core_start : 0;
+
+    std::vector<ggml_tensor *> prelude_blocks;
+    ggml_tensor *              prelude_cur = nullptr;
+    std::vector<ggml_tensor *> bank;
+    ggml_tensor *              bank_last = nullptr;
+
+    for (int il = 0; il < n_layer; ++il) {
+        const auto & layer = model.layers[il];
+        const int    ip    = hparams.loop_layer(il);
+
+        ggml_tensor * messages[4] = {nullptr, nullptr, nullptr, nullptr};
+
+        if (n_loop_core > 0 && ip >= (int) hparams.loop_core_start && ip < (int) hparams.loop_core_end) {
+            const int pass = (il - (int) hparams.loop_core_start)/n_loop_core;
+
+            if (ip == (int) hparams.loop_core_start) {
+                if (pass == 0) {
+                    prelude_blocks = blocks;
+                    prelude_cur    = cur;
+                } else {
+                    bank.assign(blocks.begin() + prelude_blocks.size() + 1, blocks.end());
+                    bank_last = cur;
+                    blocks    = prelude_blocks;
+                    cur       = prelude_cur;
+                }
+            }
+
+            if (pass > 0) {
+                const int64_t row = 2*(ip - (int) hparams.loop_core_start);
+
+                ggml_tensor * q_attn = ggml_view_2d(ctx0, model.loop_res_query,    n_embd, 2, model.loop_res_query->nb[1],    row*model.loop_res_query->nb[1]);
+                ggml_tensor * q_kv   = ggml_view_2d(ctx0, model.loop_kv_res_query, n_embd, 2, model.loop_kv_res_query->nb[1], row*model.loop_kv_res_query->nb[1]);
+
+                // rows: (attn, mlp) and (k, v)
+                ggml_tensor * m_attn = mix(bank, bank_last, q_attn);
+                ggml_tensor * m_kv   = mix(bank, bank_last, q_kv);
+
+                for (int j = 0; j < 2; ++j) {
+                    messages[j == 0 ? 0 : 3] = ggml_cont(ctx0, ggml_view_2d(ctx0, m_attn, n_embd, n_tokens, m_attn->nb[2], j*m_attn->nb[1]));
+                    messages[j == 0 ? 1 : 2] = ggml_cont(ctx0, ggml_view_2d(ctx0, m_kv,   n_embd, n_tokens, m_kv->nb[2],   j*m_kv->nb[1]));
+                }
+            }
+        }
+
+        const bool    is_swa       = hparams.is_swa(il);
+        const int64_t n_head       = hparams.n_head(il);
+        const int64_t n_head_kv    = hparams.n_head_kv(il);
+        const int64_t n_embd_head  = hparams.n_embd_head_k(il);
+        const int64_t n_embd_k_gqa = n_embd_head*n_head_kv;
+
+        ggml_tensor * state   = recr->mctx->get_r_l(il);
+        ggml_tensor * history = build_rs(recr, state, hparams.n_embd_r(), ubatch.n_seqs);
+        history = ggml_reshape_3d(ctx0, history, hparams.n_shortconv_l_cache - 1, hparams.n_sconv_channels, ubatch.n_seqs);
+
+        ggml_tensor * inpSA = cur;
+
+        // attention inputs: SWA layers mix one, full-attention layers one each for Q, K and V
+        ggml_tensor * inputs[3] = {cur, cur, cur};
+        if (layer.attn_res_query) {
+            ggml_tensor * mixed = mix(blocks, cur, layer.attn_res_query);
+            for (int j = 0; j < 3; ++j) {
+                inputs[j] = ggml_cont(ctx0, ggml_view_2d(ctx0, mixed, n_embd, n_tokens, mixed->nb[2], (is_swa ? 0 : j)*mixed->nb[1]));
+            }
+        }
+
+        if (messages[0]) {
+            // the messages enter before the input norms, so SWA layers normalize three inputs
+            for (int j = 0; j < 3; ++j) {
+                inputs[j] = control(inputs[j], messages[j], layer, j);
+            }
+            cb(inputs[0], "loop_q_inp", il);
+        }
+
+        if (is_swa && messages[0]) {
+            for (int j = 0; j < 3; ++j) {
+                inputs[j] = build_norm(inputs[j], layer.attn_norm, nullptr, LLM_NORM_RMS, il);
+            }
+        } else if (is_swa) {
+            inputs[0] = build_norm(inputs[0], layer.attn_norm, nullptr, LLM_NORM_RMS, il);
+            inputs[1] = inputs[2] = inputs[0];
+        } else {
+            inputs[0] = build_norm(inputs[0], layer.attn_q_inp_norm, nullptr, LLM_NORM_RMS, il);
+            inputs[1] = build_norm(inputs[1], layer.attn_k_inp_norm, nullptr, LLM_NORM_RMS, il);
+            inputs[2] = build_norm(inputs[2], layer.attn_v_inp_norm, nullptr, LLM_NORM_RMS, il);
+        }
+
+        // self-attention
+        {
+            ggml_tensor * Qcur = build_lora_mm(layer.wq, inputs[0]);
+            ggml_tensor * Kcur = convolve(build_lora_mm(layer.wk, inputs[1]), layer.attn_k_conv,
+                    is_swa ? nullptr : build_lora_mm(layer.attn_k_conv_proj, inputs[1]), state, history, recr, 0);
+            ggml_tensor * Vcur = convolve(build_lora_mm(layer.wv, inputs[2]), layer.attn_v_conv,
+                    is_swa ? nullptr : build_lora_mm(layer.attn_v_conv_proj, inputs[2]), state, history, recr, n_embd_k_gqa);
+            ggml_tensor * Rcur = build_lora_mm(layer.attn_rel, inputs[0]);
+
+            Qcur = clip(ggml_reshape_3d(ctx0, Qcur, n_embd_head, n_head,    n_tokens), layer.attn_q_clip, hparams.f_qk_clip);
+            Kcur = clip(ggml_reshape_3d(ctx0, Kcur, n_embd_head, n_head_kv, n_tokens), nullptr,           hparams.f_qk_clip);
+            Vcur = ggml_rms_norm(ctx0, ggml_reshape_3d(ctx0, Vcur, n_embd_head, n_head_kv, n_tokens), hparams.f_norm_rms_eps);
+            Rcur = clip(ggml_reshape_3d(ctx0, Rcur, hparams.n_relative, n_head, n_tokens), layer.attn_rel_clip, hparams.f_relative_clip);
+
+            if (!is_swa) {
+                Qcur = ggml_mul(ctx0, Qcur, tau);
+                Rcur = ggml_mul(ctx0, Rcur, tau);
+            }
+
+            cb(Qcur, "Qcur", il);
+            cb(Kcur, "Kcur", il);
+            cb(Vcur, "Vcur", il);
+            cb(Rcur, "Rcur", il);
+
+            ggml_tensor * rel_pos = is_swa ? inp->self_rel_pos_swa : inp->self_rel_pos;
+
+            const int64_t n_stream = (is_swa ? attn->self_attn_mask_swa.raw : attn->self_attn_mask.raw)->ne[3];
+            const int64_t n_kv     = rel_pos->ne[0];
+
+            ggml_tensor * sinks = build_lora_mm(layer.attn_sink_proj, inputs[0]);
+
+            // project r on the bias table first, then gather by distance: only the gathered bias is n_kv x n_tokens x n_head
+            ggml_tensor * table = ggml_mul_mat(ctx0, ggml_pad(ctx0, layer.attn_rel_bias, 0, 1, 0, 0), Rcur);
+
+            // the sink logit t is per query: exp(s - t)/(1 + sum(exp(s - t))) = exp(s)/(exp(t) + sum(exp(s))), with a zero sink
+            table = ggml_sub(ctx0, table, ggml_reshape_3d(ctx0, sinks, 1, n_head, n_tokens));
+            table = ggml_cont(ctx0, ggml_permute(ctx0, table, 1, 0, 2, 3));
+
+            ggml_tensor * kq_b = ggml_get_rows(ctx0, table, rel_pos);
+            kq_b = ggml_reshape_4d(ctx0, kq_b, n_head, n_kv, n_tokens/n_stream, n_stream);
+            kq_b = ggml_cont(ctx0, ggml_permute(ctx0, kq_b, 2, 0, 1, 3));
+            cb(kq_b, "kq_b", il);
+
+            sinks = ggml_fill(ctx0, ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, n_head), 0.0f);
+
+            cur = build_attn(inp,
+                    nullptr, nullptr, nullptr,
+                    Qcur, Kcur, Vcur, kq_b, sinks, 1.0f/sqrtf(n_embd_head), il);
+
+            cur = ggml_mul(ctx0, cur, ggml_sigmoid(ctx0, build_lora_mm(layer.wqkv_gate, inputs[0])));
+            cur = convolve(build_lora_mm(layer.wo, cur), layer.attn_post_conv, nullptr, state, history, recr, 2*n_embd_k_gqa);
+            cb(cur, "attn_out", il);
+        }
+
+        // the first layer of each block starts a new residual stream, the earlier one joins the mixed blocks
+        if (ip % hparams.attn_res_block_size == 0) {
+            blocks.push_back(inpSA);
+        } else {
+            cur = ggml_add(ctx0, inpSA, cur);
+        }
+
+        ggml_tensor * ffn_inp = cur;
+        cb(ffn_inp, "ffn_inp", il);
+
+        // MoE
+        cur = ggml_reshape_2d(ctx0, mix(blocks, cur, layer.ffn_res_query), n_embd, n_tokens);
+        if (messages[3]) {
+            cur = control(cur, messages[3], layer, 3);
+            cb(cur, "loop_ffn_inp", il);
+        }
+        cur = build_norm(cur, layer.ffn_norm, nullptr, LLM_NORM_RMS, il);
+
+        cur = build_moe_ffn(cur,
+                layer.ffn_gate_inp,
+                nullptr,
+                nullptr,
+                layer.ffn_down_exps,
+                layer.ffn_exp_probs_b,
+                hparams.n_expert,
+                hparams.n_expert_used(il),
+                LLM_FFN_SITU, true,
+                hparams.expert_weights_scale,
+                LLAMA_EXPERT_GATING_FUNC_TYPE_SIGMOID,
+                il,
+                nullptr,
+                layer.ffn_gate_up_exps);
+
+        cur = convolve(cur, layer.ffn_post_conv, nullptr, state, history, recr, 2*n_embd_k_gqa + n_embd);
+        cb(cur, "ffn_out", il);
+
+        cur = ggml_add(ctx0, ffn_inp, cur);
+        cb(cur, "l_out", il);
+    }
+
+    cur = ggml_reshape_2d(ctx0, mix(blocks, cur, model.output_res_query), n_embd, n_tokens);
+    cur = build_norm(cur, model.output_norm, nullptr, LLM_NORM_RMS, -1);
+
+    if (inp_out_ids) {
+        cur = ggml_get_rows(ctx0, cur, inp_out_ids);
+    }
+
+    cb(cur, "result_norm", -1);
+    res->t_embd = cur;
+
+    // lm_head
+    cur = build_lora_mm(model.output, cur);
+    ggml_prec_set_acc(cur, GGML_PREC_F32);
+
+    if (hparams.f_final_logit_softcapping != 0.0f) {
+        const float cap = hparams.f_final_logit_softcapping;
+
+        cur = ggml_scale(ctx0, ggml_tanh(ctx0, ggml_scale(ctx0, cur, 1.0f/cap)), cap);
+    }
+
+    // drop the padded vocabulary
+    cur = ggml_cont(ctx0, ggml_view_2d(ctx0, cur, hparams.n_vocab_unpadded, cur->ne[1], cur->nb[1], 0));
+
+    cb(cur, "result_output", -1);
+    res->t_logits = cur;
+}
+
+
+int llama_server(int argc, char ** argv);
+
+int main(int argc, char ** argv) {
+    return llama_server(argc, argv);
+}
+
+
+#include "server-chat.h"
+#include "server-common.h"
+
+#include <sstream>
+
+json server_chat_convert_responses_tools(const json & tools) {
+    if (!tools.is_array()) {
+        throw std::invalid_argument("'tools' must be an array of objects");
+    }
+    json chatcmpl_tools = json::array();
+    for (json resp_tool : tools) {
+        json chatcmpl_tool;
+
+        const std::string type = json_value(resp_tool, "type", std::string());
+        if (type != "function") {
+            // Non-function Responses tools have no Chat Completions equivalent.
+            SRV_WRN("unsupported Responses tool type '%s' skipped\n", type.c_str());
+            continue;
+        }
+        resp_tool.erase("type");
+        chatcmpl_tool["type"] = "function";
+
+        if (!resp_tool.contains("strict")) {
+            resp_tool["strict"] = true;
+        }
+        chatcmpl_tool["function"] = resp_tool;
+        chatcmpl_tools.push_back(chatcmpl_tool);
+    }
+    return chatcmpl_tools;
+}
+
+json server_chat_convert_responses_to_chatcmpl(const json & response_body) {
+    if (!response_body.contains("input")) {
+        throw std::invalid_argument("'input' is required");
+    }
+    if (!json_value(response_body, "previous_response_id", std::string{}).empty()) {
+        throw std::invalid_argument("llama.cpp does not support 'previous_response_id'.");
+    }
+
+    const json input_value = response_body.at("input");
+    json chatcmpl_body = response_body;
+    chatcmpl_body.erase("input");
+    std::vector<json> chatcmpl_messages;
+
+    if (response_body.contains("instructions")) {
+        chatcmpl_messages.push_back({
+            {"role",    "system"},
+            {"content", json_value(response_body, "instructions", std::string())},
+        });
+        chatcmpl_body.erase("instructions");
+    }
+
+    if (input_value.is_string()) {
+        // #responses_create-input-text_input
+        chatcmpl_messages.push_back({
+            {"role",    "user"},
+            {"content", input_value},
+        });
+    } else if (input_value.is_array()) {
+        // #responses_create-input-input_item_list
+
+        static auto exists_and_is_array = [](const json & j, const char * key) -> bool {
+            return j.contains(key) && j.at(key).is_array();
+        };
+        static auto exists_and_is_string = [](const json & j, const char * key) -> bool {
+            return j.contains(key) && j.at(key).is_string();
+        };
+
+        for (json item : input_value) {
+            bool merge_prev = !chatcmpl_messages.empty() && chatcmpl_messages.back().value("role", "") == "assistant";
+
+            if (exists_and_is_string(item, "content")) {
+                // #responses_create-input-input_item_list-input_message-content-text_input
+                // Only "Input message" contains item["content"]::string
+                // After converting item["content"]::string to item["content"]::array,
+                // we can treat "Input message" as sum of "Item-Input message" and "Item-Output message"
+                item["content"] = json::array({
+                    json {
+                        {"text", item.at("content")},
+                        {"type", "input_text"}
+                    }
+                });
+            }
+
+            if (exists_and_is_array(item, "content") &&
+                exists_and_is_string(item, "role") &&
+                (item.at("role") == "user" ||
+                    item.at("role") == "system" ||
+                    item.at("role") == "developer")
+            ) {
+                // #responses_create-input-input_item_list-item-input_message
+                std::vector<json> chatcmpl_content;
+
+                for (const json & input_item : item.at("content")) {
+                    const std::string type = json_value(input_item, "type", std::string());
+
+                    if (type == "input_text") {
+                        if (!input_item.contains("text")) {
+                            throw std::invalid_argument("'Input text' requires 'text'");
+                        }
+                        chatcmpl_content.push_back({
+                            {"text", input_item.at("text")},
+                            {"type", "text"},
+                        });
+                    } else if (type == "input_image") {
+                        // While `detail` is marked as required,
+                        // it has default value("auto") and can be omitted.
+
+                        if (!input_item.contains("image_url")) {
+                            throw std::invalid_argument("'image_url' is required");
+                        }
+                        chatcmpl_content.push_back({
+                            {"image_url", json {
+                                {"url", input_item.at("image_url")}
+                            }},
+                            {"type", "image_url"},
+                        });
+                    } else if (type == "input_file") {
+                        throw std::invalid_argument("'input_file' is not supported by llamacpp at this moment");
+                    } else {
+                        throw std::invalid_argument("'type' must be one of 'input_text', 'input_image', or 'input_file'");
+                    }
+                }
+
+                if (item.contains("type")) {
+                    item.erase("type");
+                }
+                if (item.contains("status")) {
+                    item.erase("status");
+                }
+                item["content"] = chatcmpl_content;
+
+                chatcmpl_messages.push_back(item);
+            } else if (exists_and_is_string(item, "role") &&
+                item.at("role") == "assistant" &&
+                exists_and_is_string(item, "type") &&
+                item.at("type") == "message"
+            ) {
+                // #responses_create-input-input_item_list-item-output_message
+                auto chatcmpl_content = json::array();
+
+                // Handle both string content and array content
+                if (item.contains("content") && item.at("content").is_string()) {
+                    // String content - convert to text content part
+                    chatcmpl_content.push_back({
+                        {"text", item.at("content")},
+                        {"type", "text"},
+                    });
+                } else if (exists_and_is_array(item, "content")) {
+                    // Array content - process each item
+                    for (const auto & output_text : item.at("content")) {
+                        const std::string type = json_value(output_text, "type", std::string());
+                        if (type == "output_text" || type == "input_text") {
+                            // Accept both output_text and input_text (string content gets converted to input_text)
+                            if (!exists_and_is_string(output_text, "text")) {
+                                throw std::invalid_argument("'Output text' requires 'text'");
+                            }
+                            chatcmpl_content.push_back({
+                                {"text", output_text.at("text")},
+                                {"type", "text"},
+                            });
+                        } else if (type == "refusal") {
+                            if (!exists_and_is_string(output_text, "refusal")) {
+                                throw std::invalid_argument("'Refusal' requires 'refusal'");
+                            }
+                            chatcmpl_content.push_back({
+                                {"refusal", output_text.at("refusal")},
+                                {"type", "refusal"},
+                            });
+                        } else {
+                            throw std::invalid_argument("'type' must be one of 'output_text' or 'refusal'");
+                        }
+                    }
+                }
+
+                if (merge_prev) {
+                    auto & prev_msg = chatcmpl_messages.back();
+                    if (!exists_and_is_array(prev_msg, "content")) {
+                        prev_msg["content"] = json::array();
+                    }
+                    auto & prev_content = prev_msg["content"];
+                    prev_content.insert(chatcmpl_content);
+                } else {
+                    item.erase("status");
+                    item.erase("type");
+                    item["content"] = chatcmpl_content;
+                    chatcmpl_messages.push_back(item);
+                }
+            } else if (exists_and_is_string(item, "arguments") &&
+                exists_and_is_string(item, "call_id") &&
+                exists_and_is_string(item, "name") &&
+                exists_and_is_string(item, "type") &&
+                item.at("type") == "function_call"
+            ) {
+                // #responses_create-input-input_item_list-item-function_tool_call
+                json tool_call = {
+                    {"function", json {
+                        {"arguments", item.at("arguments")},
+                        {"name",      item.at("name")},
+                    }},
+                    {"id",   item.at("call_id")},
+                    {"type", "function"},
+                };
+
+                if (merge_prev) {
+                    auto & prev_msg = chatcmpl_messages.back();
+                    if (!exists_and_is_array(prev_msg, "tool_calls")) {
+                        prev_msg["tool_calls"] = json::array();
+                    }
+                    prev_msg["tool_calls"].push_back(tool_call);
+                } else {
+                    chatcmpl_messages.push_back(json {
+                        {"role",       "assistant"},
+                        {"tool_calls", json::array({tool_call})}
+                    });
+                }
+            } else if (exists_and_is_string(item, "call_id") &&
+                (exists_and_is_string(item, "output") || exists_and_is_array(item, "output")) &&
+                exists_and_is_string(item, "type") &&
+                item.at("type") == "function_call_output"
+            ) {
+                // #responses_create-input-input_item_list-item-function_tool_call_output
+                if (item.at("output").is_string()) {
+                    chatcmpl_messages.push_back(json {
+                        {"content",      item.at("output")},
+                        {"role",         "tool"},
+                        {"tool_call_id", item.at("call_id")},
+                    });
+                } else {
+                    json chatcmpl_outputs = item.at("output");
+                    for (json & chatcmpl_output : chatcmpl_outputs) {
+                        if (!chatcmpl_output.contains("type")) {
+                            throw std::invalid_argument("Output of tool call missing 'type' field");
+                        }
+                        const auto type = chatcmpl_output.at("type");
+                        if (type != "input_text" && type != "input_image") {
+                            throw std::invalid_argument("Output of tool call should be 'Input text' or 'Input image'");
+                        }
+                        if (type == "input_text") {
+                            chatcmpl_output["type"] = "text";
+                        } else if (type == "input_image") {
+                            if (!chatcmpl_output.contains("image_url")) {
+                                throw std::invalid_argument("'image_url' is required");
+                            }
+                            chatcmpl_output["type"] = "image_url";
+                            chatcmpl_output["image_url"] = json {
+                                {"url", chatcmpl_output.at("image_url")}
+                            };
+                        }
+                    }
+                    chatcmpl_messages.push_back(json {
+                        {"content",      chatcmpl_outputs},
+                        {"role",         "tool"},
+                        {"tool_call_id", item.at("call_id")},
+                    });
+                }
+            } else if (exists_and_is_array(item, "summary") &&
+                exists_and_is_string(item, "type") &&
+                item.at("type") == "reasoning") {
+                // #responses_create-input-input_item_list-item-reasoning
+
+                if (!exists_and_is_array(item, "content")) {
+                    throw std::invalid_argument("item['content'] is not an array");
+                }
+                if (item.at("content").empty()) {
+                    throw std::invalid_argument("item['content'] is empty");
+                }
+                if (!exists_and_is_string(item.at("content")[0], "text")) {
+                    throw std::invalid_argument("item['content']['text'] is not a string");
+                }
+
+                if (merge_prev) {
+                    auto & prev_msg = chatcmpl_messages.back();
+                    prev_msg["reasoning_content"] = item.at("content")[0].at("text");
+                } else {
+                    chatcmpl_messages.push_back(json {
+                        {"role", "assistant"},
+                        {"content", json::array()},
+                        {"reasoning_content", item.at("content")[0].at("text")},
+                    });
+                }
+            } else {
+                throw std::invalid_argument("Cannot determine type of 'item'");
+            }
+        }
+    } else {
+        throw std::invalid_argument("'input' must be a string or array of objects");
+    }
+
+    chatcmpl_body["messages"] = chatcmpl_messages;
+
+    if (response_body.contains("tools")) {
+        const json chatcmpl_tools = server_chat_convert_responses_tools(response_body.at("tools"));
+        chatcmpl_body.erase("tools");
+        if (!chatcmpl_tools.empty()) {
+            chatcmpl_body["tools"] = chatcmpl_tools;
+        }
+    }
+
+    if (response_body.contains("max_output_tokens")) {
+        chatcmpl_body.erase("max_output_tokens");
+        chatcmpl_body["max_tokens"] = response_body["max_output_tokens"];
+    }
+
+    if (response_body.contains("reasoning")) {
+        // Only "effort" is handled so far
+        const json & reasoning = response_body.at("reasoning");
+        if (reasoning.contains("effort")) {
+            chatcmpl_body["reasoning_effort"] = reasoning.at("effort");
+        }
+        chatcmpl_body.erase("reasoning");
+    }
+
+    if (response_body.contains("text")) {
+        const json & text = response_body.at("text");
+        if (!text.is_object()) {
+            throw std::invalid_argument("'text' must be an object");
+        }
+
+        chatcmpl_body.erase("text");
+        if (text.contains("format")) {
+            const json & format = text.at("format");
+            if (!format.is_object()) {
+                throw std::invalid_argument("'text.format' must be an object");
+            }
+
+            const std::string type = json_value(format, "type", std::string());
+            if (type == "json_schema") {
+                chatcmpl_body["response_format"] = {
+                    {"type", "json_schema"},
+                    {"json_schema", format},
+                };
+                chatcmpl_body["response_format"]["json_schema"].erase("type");
+            } else if (type == "json_object" || type == "text") {
+                chatcmpl_body["response_format"] = format;
+            } else if (!type.empty()) {
+                throw std::invalid_argument("'text.format.type' must be one of 'text', 'json_object', or 'json_schema'");
+            }
+        }
+    }
+
+    // llama.cpp params (e.g. seed, min_p) go under extra_params and are merged into the converted body
+    if (response_body.contains("extra_params")) {
+        chatcmpl_body.erase("extra_params");
+        if (response_body.at("extra_params").is_object()) {
+            for (const auto & [key, value] : response_body.at("extra_params").items()) {
+                chatcmpl_body[key] = value;
+            }
+        }
+    }
+
+    return chatcmpl_body;
+}
+
+// Edits the cch section of an "x-anthropic-billing-header" system prompt.
+// Does nothing to any other prompt.
+//
+// This is a claude message with a "cch=ef01a" attribute that breaks prefix caching.
+// The cch stamp is a whitebox end-to-end integrity hint. It's not meaningful as a
+// system prompt data, particularly to llama.cpp, but its presence means the prefix
+// cache will not get past it: It changes on each request.
+//
+// Reference: https://github.com/ggml-org/llama.cpp/pull/21793
+// Example header:
+// ```
+// x-anthropic-billing-header: cc_version=2.1.101.e51; cc_entrypoint=cli; cch=a5145;You are Claude Code, Anthropic's official CLI for Claude.
+//                                                                            ^^^^^
+// ```
+static void normalize_anthropic_billing_header(std::string & system_text) {
+    if (system_text.rfind("x-anthropic-billing-header:", 0) != 0) {
+        return;
+    }
+
+    const size_t header_prefix_length = strlen("x-anthropic-billing-header:");
+    const size_t cch_length = 5;
+    const size_t index_cch = system_text.find("cch=", header_prefix_length);
+    if (index_cch == std::string::npos) {
+        return;
+    }
+
+    const size_t index_replace = index_cch + 4;
+    if (index_replace + cch_length < system_text.length() && system_text[index_replace + cch_length] == ';') {
+        for (size_t i = 0; i < cch_length; ++i) {
+            system_text[index_replace + i] = 'f';
+        }
+    } else {
+        LOG_ERR("anthropic string not as expected: %s", system_text.c_str());
+    }
+}
+
+json server_chat_convert_anthropic_to_oai(const json & body) {
+    json oai_body;
+
+    // Convert system prompt
+    json oai_messages = json::array();
+    auto system_param = json_value(body, "system", json());
+    if (!system_param.is_null()) {
+        std::string system_content;
+
+        if (system_param.is_string()) {
+            system_content = system_param.get<std::string>();
+            normalize_anthropic_billing_header(system_content);
+        } else if (system_param.is_array()) {
+            for (const auto & block : system_param) {
+                if (json_value(block, "type", std::string()) == "text") {
+                    auto system_text = json_value(block, "text", std::string());
+                    normalize_anthropic_billing_header(system_text);
+                    system_content += system_text;
+                }
+            }
+        }
+
+        oai_messages.push_back({
+            {"role", "system"},
+            {"content", system_content}
+        });
+    }
+
+    // Convert messages
+    if (!body.contains("messages")) {
+        throw std::runtime_error("'messages' is required");
+    }
+    const json & messages = body.at("messages");
+    if (messages.is_array()) {
+        for (const auto & msg : messages) {
+            std::string role = json_value(msg, "role", std::string());
+
+            if (!msg.contains("content")) {
+                if (role == "assistant") {
+                    continue;
+                }
+                oai_messages.push_back(msg);
+                continue;
+            }
+
+            const json & content = msg.at("content");
+
+            if (content.is_string()) {
+                oai_messages.push_back(msg);
+                continue;
+            }
+
+            if (!content.is_array()) {
+                oai_messages.push_back(msg);
+                continue;
+            }
+
+            json tool_calls = json::array();
+            json converted_content = json::array();
+            json tool_results = json::array();
+            std::string reasoning_content;
+            bool has_tool_calls = false;
+
+            for (const auto & block : content) {
+                std::string type = json_value(block, "type", std::string());
+
+                if (type == "text") {
+                    converted_content.push_back(block);
+                } else if (type == "thinking") {
+                    reasoning_content += json_value(block, "thinking", std::string());
+                } else if (type == "image") {
+                    json source = json_value(block, "source", json::object());
+                    std::string source_type = json_value(source, "type", std::string());
+
+                    if (source_type == "base64") {
+                        std::string media_type = json_value(source, "media_type", std::string("image/jpeg"));
+                        std::string data = json_value(source, "data", std::string());
+                        std::ostringstream ss;
+                        ss << "data:" << media_type << ";base64," << data;
+
+                        converted_content.push_back({
+                            {"type", "image_url"},
+                            {"image_url", {
+                                {"url", ss.str()}
+                            }}
+                        });
+                    } else if (source_type == "url") {
+                        std::string url = json_value(source, "url", std::string());
+                        converted_content.push_back({
+                            {"type", "image_url"},
+                            {"image_url", {
+                                {"url", url}
+                            }}
+                        });
+                    }
+                } else if (type == "tool_use") {
+                    tool_calls.push_back({
+                        {"id", json_value(block, "id", std::string())},
+                        {"type", "function"},
+                        {"function", {
+                            {"name", json_value(block, "name", std::string())},
+                            {"arguments", json_value(block, "input", json::object()).dump()}
+                        }}
+                    });
+                    has_tool_calls = true;
+                } else if (type == "tool_result") {
+                    std::string tool_use_id = json_value(block, "tool_use_id", std::string());
+
+                    auto result_content = json_value(block, "content", json());
+                    if (result_content.is_string()) {
+                        tool_results.push_back({
+                            {"role", "tool"},
+                            {"tool_call_id", tool_use_id},
+                            {"content", result_content.get<std::string>()}
+                        });
+                    } else if (result_content.is_array()) {
+                        // Single-pass: build both text and content_parts, decide format at the end
+                        std::string result_text;
+                        json content_parts = json::array();
+                        bool keep_parts = false; // images or tool references
+
+                        for (const auto & c : result_content) {
+                            std::string c_type = json_value(c, "type", std::string());
+                            if (c_type == "text") {
+                                std::string text = json_value(c, "text", std::string());
+                                result_text += text;
+                                content_parts.push_back({
+                                    {"type", "text"},
+                                    {"text", text}
+                                });
+                            } else if (c_type == "image") {
+                                keep_parts = true;
+                                json source = json_value(c, "source", json::object());
+                                std::string source_type = json_value(source, "type", std::string());
+                                if (source_type == "base64") {
+                                    std::string media_type = json_value(source, "media_type", std::string("image/jpeg"));
+                                    std::string data = json_value(source, "data", std::string());
+                                    std::string url = "data:" + media_type + ";base64," + data;
+                                    content_parts.push_back({
+                                        {"type", "image_url"},
+                                        {"image_url", {{"url", url}}}
+                                    });
+                                } else if (source_type == "url") {
+                                    content_parts.push_back({
+                                        {"type", "image_url"},
+                                        {"image_url", {{"url", json_value(source, "url", std::string())}}}
+                                    });
+                                }
+                            } else if (c_type == "tool_reference") {
+                                // tool search result naming a deferred tool
+                                keep_parts = true;
+                                content_parts.push_back({
+                                    {"type", "tool_reference"},
+                                    {"name", json_value(c, "tool_name", std::string())}
+                                });
+                            }
+                        }
+
+                        if (!keep_parts) {
+                            // Text-only: collapse to a plain string for maximum compatibility
+                            tool_results.push_back({
+                                {"role", "tool"},
+                                {"tool_call_id", tool_use_id},
+                                {"content", result_text}
+                            });
+                        } else {
+                            // images or tool references: keep array content parts
+                            tool_results.push_back({
+                                {"role", "tool"},
+                                {"tool_call_id", tool_use_id},
+                                {"content", content_parts}
+                            });
+                        }
+                    } else {
+                        tool_results.push_back({
+                            {"role", "tool"},
+                            {"tool_call_id", tool_use_id},
+                            {"content", ""}
+                        });
+                    }
+                }
+            }
+
+            if (!converted_content.empty() || has_tool_calls || !reasoning_content.empty()) {
+                json new_msg = {{"role", role}};
+                if (!converted_content.empty()) {
+                    new_msg["content"] = converted_content;
+                } else if (has_tool_calls || !reasoning_content.empty()) {
+                    new_msg["content"] = "";
+                }
+                if (!tool_calls.empty()) {
+                    new_msg["tool_calls"] = tool_calls;
+                }
+                if (!reasoning_content.empty()) {
+                    new_msg["reasoning_content"] = reasoning_content;
+                }
+                oai_messages.push_back(new_msg);
+            }
+
+            for (const auto & tool_msg : tool_results) {
+                oai_messages.push_back(tool_msg);
+            }
+        }
+    }
+
+    oai_body["messages"] = oai_messages;
+
+    // Convert tools
+    if (body.contains("tools")) {
+        const json & tools = body.at("tools");
+        if (tools.is_array()) {
+            json oai_tools = json::array();
+            for (const auto & tool : tools) {
+                oai_tools.push_back({
+                    {"type", "function"},
+                    {"function", {
+                        {"name", json_value(tool, "name", std::string())},
+                        {"description", json_value(tool, "description", std::string())},
+                        {"parameters", tool.contains("input_schema") ? tool.at("input_schema") : json::object()}
+                    }}
+                });
+                if (tool.contains("defer_loading")) {
+                    oai_tools.back()["defer_loading"] = tool.at("defer_loading");
+                }
+            }
+            oai_body["tools"] = oai_tools;
+        }
+    }
+
+    // Convert tool_choice
+    if (body.contains("tool_choice")) {
+        const json & tc = body.at("tool_choice");
+        if (tc.is_object()) {
+            std::string type = json_value(tc, "type", std::string());
+            if (type == "auto") {
+                oai_body["tool_choice"] = "auto";
+            } else if (type == "any" || type == "tool") {
+                oai_body["tool_choice"] = "required";
+            }
+        }
+    }
+
+    // Convert stop_sequences to stop
+    if (body.contains("stop_sequences")) {
+        oai_body["stop"] = body.at("stop_sequences");
+    }
+
+    // Handle max_tokens (required in Anthropic, but we're permissive)
+    if (body.contains("max_tokens")) {
+        oai_body["max_tokens"] = body.at("max_tokens");
+    } else {
+        oai_body["max_tokens"] = 4096;
+    }
+
+    // Pass through common params
+    for (const auto & key : {"temperature", "top_p", "top_k", "stream", "chat_template_kwargs", "id_slot"}) {
+        if (body.contains(key)) {
+            oai_body[key] = body.at(key);
+        }
+    }
+
+    // Handle Anthropic-specific thinking param
+    if (body.contains("thinking")) {
+        json thinking = json_value(body, "thinking", json::object());
+        std::string thinking_type = json_value(thinking, "type", std::string());
+        if (thinking_type == "enabled") {
+            int budget_tokens = json_value(thinking, "budget_tokens", 10000);
+            oai_body["thinking_budget_tokens"] = budget_tokens;
+        }
+    }
+
+    // Handle Anthropic-specific output_config param
+    if (body.contains("output_config")) {
+        json output_config = json_value(body, "output_config", json::object());
+        std::string effort = json_value(output_config, "effort", std::string());
+        if (!effort.empty()) {
+            oai_body["reasoning_effort"] = effort;
+        }
+    }
+
+    // Handle Anthropic-specific metadata param
+    if (body.contains("metadata")) {
+        json metadata = json_value(body, "metadata", json::object());
+        std::string user_id = json_value(metadata, "user_id", std::string());
+        if (!user_id.empty()) {
+            oai_body["__metadata_user_id"] = user_id;
+        }
+    }
+
+    // llama.cpp params (e.g. seed, min_p) go under extra_params and are merged into the converted body
+    if (body.contains("extra_params") && body.at("extra_params").is_object()) {
+        for (const auto & [key, value] : body.at("extra_params").items()) {
+            oai_body[key] = value;
+        }
+    }
+
+    return oai_body;
+}
+
+json server_chat_msg_diff_to_json_oaicompat(const common_chat_msg_diff & diff) {
+    json delta = json::object();
+    if (!diff.reasoning_content_delta.empty()) {
+        delta["reasoning_content"] = diff.reasoning_content_delta;
+    }
+    if (!diff.content_delta.empty()) {
+        delta["content"] = diff.content_delta;
+    }
+    if (diff.tool_call_index != std::string::npos) {
+        json tool_call;
+        tool_call["index"] = diff.tool_call_index;
+        if (!diff.tool_call_delta.id.empty()) {
+            tool_call["id"]   = diff.tool_call_delta.id;
+            tool_call["type"] = "function";
+        }
+        if (!diff.tool_call_delta.name.empty() || !diff.tool_call_delta.arguments.empty()) {
+            json function = json::object();
+            if (!diff.tool_call_delta.name.empty()) {
+                function["name"] = diff.tool_call_delta.name;
+            }
+            if (!diff.tool_call_delta.arguments.empty()) {
+                function["arguments"] = diff.tool_call_delta.arguments;
+            }
+            tool_call["function"] = function;
+        }
+        delta["tool_calls"] = json::array({ tool_call });
+    }
+    return delta;
+}
+
+json convert_transcriptions_to_chatcmpl(
+        const json & inp_body,
+        const common_chat_templates * tmpls,
+        const std::map<std::string, uploaded_file> & in_files,
+        std::vector<raw_buffer> & out_files) {
+    // TODO @ngxson : this function may need to be improved in the future
+    // handle input files
+    out_files.clear();
+    auto it = in_files.find("file");
+    if (it != in_files.end()) {
+        out_files.push_back(it->second.data);
+    } else {
+        throw std::invalid_argument("No input file found for transcription");
+    }
+
+    // handle input data
+    std::string prompt          = json_value(inp_body, "prompt", std::string());
+    std::string language        = json_value(inp_body, "language", std::string());
+    std::string response_format = json_value(inp_body, "response_format", std::string("json"));
+    if (response_format != "json") {
+        throw std::invalid_argument("Only 'json' response_format is supported for transcription");
+    }
+    common_chat_prompt_preset preset = common_chat_get_asr_prompt(tmpls, language, 0.0, prompt);
+    if (preset.needs_audio_length) {
+        mtmd_helper_media_meta meta;
+        if (mtmd_helper_get_media_meta(out_files[0].data(), out_files[0].size(), mtmd_helper_init_opt_default(), &meta) != 0 ||
+                meta.type != MTMD_HELPER_MEDIA_TYPE_AUDIO || meta.duration < 0) {
+            throw std::invalid_argument("the input file is not a supported audio file");
+        }
+        preset = common_chat_get_asr_prompt(tmpls, language, meta.duration, prompt);
+    }
+    if (prompt.empty() || preset.has_context) {
+        prompt = preset.user;
+    }
+    if (!language.empty() && !preset.has_language) {
+        prompt += string_format(" (language: %s)", language.c_str());
+    }
+    prompt = preset.media_first ? get_media_marker() + prompt : prompt + get_media_marker();
+
+    json messages = json::array();
+    if (!preset.system.empty()) {
+        messages.push_back({{"role", "system"}, {"content", preset.system}});
+    }
+    messages.push_back({{"role", "user"}, {"content", prompt}});
+
+    json chatcmpl_body = inp_body; // copy all fields
+    chatcmpl_body["messages"] = messages;
+
+    // because input from form-data, everything is string, we need to correct the types here
+    std::string stream = json_value(in
+
+# XCFramework
+
+The XCFramework is a precompiled version of the library for iOS, visionOS, tvOS,
+and macOS. It can be used in Swift projects without the need to compile the
+library from source. For example:
+
+```swift
+// swift-tools-version: 5.10
+// The swift-tools-version declares the minimum version of Swift required to build this package.
+
+import PackageDescription
+
+let package = Package(
+    name: "MyLlamaPackage",
+    targets: [
+        .executableTarget(
+            name: "MyLlamaPackage",
+            dependencies: [
+                "LlamaFramework"
+            ]),
+        .binaryTarget(
+            name: "LlamaFramework",
+            url: "https://github.com/ggml-org/llama.cpp/releases/download/b5046/llama-b5046-xcframework.zip",
+            checksum: "c19be78b5f00d8d29a25da41042cb7afa094cbf6280a225abe614b03b20029ab"
+        )
+    ]
+)
+```
+
+The above example is using an intermediate build `b5046` of the library. This can be modified
+to use a different version by changing the URL and checksum.
+
+
+# TTS normalization patterns
+
+Text-to-speech models often need their input normalized before tokenization: numbers, currencies, dates and symbols spelled out, punctuation mapped, spacing fixed. The exact rules are model-specific (they must match what the model was trained on), so they live in the model's `tts` task template rather than in C++.
+
+Jinja has no regex support, and exposing `std::regex` / Python `re` would not help: the two differ in many details (`\d`, `\w`, `\b`, lookbehind, case folding, backtracking limits), so a template could give different results in llama.cpp and in Python. Instead, task templates get two functions with a small matching language whose semantics are defined here:
+
+- `tts_norm_scan(text, rules)`: split text into matched and unmatched segments
+- `tts_norm_sub(text, pattern, repl)`: replace every match
+
+A third function, `tts_dict(name, key)`, gives the template access to dictionaries stored in the model (e.g. a pronunciation lexicon).
+
+A fourth one, `tts_g2p(word)`, gives the pronunciation of a word by the letter-to-sound model of the mmproj, when the caller provides one (see below).
+
+Implementations:
+- C++: [common/chat-tts-norm.cpp](../common/chat-tts-norm.cpp), injected into task templates by `common_chat_template_render()` in [common/chat.cpp](../common/chat.cpp). They are not available to chat templates.
+- Python reference: [scripts/chat_tts_norm.py](../scripts/chat_tts_norm.py), for use with `jinja2` (`env.globals["tts_norm_scan"] = chat_tts_norm.tts_norm_scan`)
+- Both are checked against each other by `tests/test-jinja.cpp` (`test-jinja -py "tts norm patterns.*"`)
+
+## Example
+
+```jinja
+{%- for s in tts_norm_scan(text, [
+    ['money',   '%$(%d+)(?:%.(%d%d))?'],
+    ['percent', '(%d+)%%'],
+    ['time',    '(%d%d?):(%d%d)(?!%d)'],
+    ['neg',     '(?<!%w)-(%d+)'],
+    ['number',  '%d+'],
+]) -%}
+  {%- if   s.rule == 'money'   -%}{%- set whole, cents = s.groups -%}{{ num(whole) }} dollars{{ ' and ' ~ num(cents) ~ ' cents' if cents else '' }}
+  {%- elif s.rule == 'percent' -%}{{ num(s.groups[0]) }} percent
+  {%- elif s.rule == 'time'    -%}{%- set h, m = s.groups -%}{{ num(h) }} {{ num(m) }}
+  {%- elif s.rule == 'neg'     -%}minus {{ num(s.groups[0]) }}
+  {%- elif s.rule == 'number'  -%}{{ num(s.text) }}
+  {%- else -%}{{ s.text }}
+  {%- endif -%}
+{%- endfor -%}
+```
+
+`It costs $3.50, 20% off, at 10:45, -5 degrees, 7 cats.` becomes `It costs three dollars and fifty cents, twenty percent off, at ten forty-five, minus five degrees, seven cats.` (with a `num` macro that spells numbers, see the "mini text normalizer" test in `tests/test-jinja.cpp`).
+
+## Functions
+
+### `tts_norm_scan(text, rules)`
+
+`rules` is one of:
+- a list of `[name, pattern]` pairs (recommended, the order is explicit)
+- a dict `{name: pattern}`, in insertion order
+- a single pattern string, the rule is named `match`
+
+Scanning starts at the first codepoint. At each position, the rules are tried in order and the first one that produces a **non-empty** match wins; the scan continues after the match. If no rule matches, one codepoint is skipped. Matches never overlap.
+
+The result is a list of segments covering the whole text, in order. Consecutive unmatched codepoints are merged into one segment. Each segment is a dict:
+
+| key | matched segment | unmatched segment |
+|---|---|---|
+| `rule` | rule name | `none` |
+| `text` | matched text | unmatched text |
+| `groups` | list of capture groups, in order of their `(` | `[]` |
+
+There are no named groups, unpack `groups` instead: `{% set whole, cents = s.groups %}`.
+
+A group that did not participate in the match (e.g. inside a `?` that matched nothing) is an empty string, so it renders as nothing and is falsy.
+
+### `tts_norm_sub(text, pattern, repl)`
+
+Replaces every match of `pattern`, with the same scanning rules as `tts_norm_scan`. `repl` is a literal string with references:
+
+| reference | value |
+|---|---|
+| `%0` | whole match |
+| `%1` .. `%9` | group |
+| `%%` | a literal `%` |
+
+Any other `%` sequence in `repl`, or a reference to a group that does not exist, is an error.
+
+### `tts_dict(name, key)`
+
+Looks up `key` in the dictionary `name` of the model and returns its value, or `none` if the key is missing. An unknown dictionary name is an error. A model can ship any number of dictionaries, for example a pronunciation lexicon per language:
+
+```jinja
+{%- set e = tts_dict('lexicon_en', word) -%}
+{%- if e is none -%}{{ spell(word) }}
+{%- elif e is mapping -%}{{ e[tag] if tag in e else e.DEFAULT }}
+{%- else -%}{{ e }}
+{%- endif -%}
+```
+
+The lookup is exact: no case folding and no normalization, do them in the template.
+
+The GGUF lists the names of the dictionaries in `tokenizer.tts_dicts`. Each one is stored as two arrays of strings of the same length: `tokenizer.tts_dict.<name>.keys`, sorted by the UTF-8 bytes of the key, and `tokenizer.tts_dict.<name>.values`. A value is a JSON document (string, number, list, object, ...) and is returned decoded. `GGUFWriter.add_tts_dicts(dicts)` writes all of this.
+
+### `tts_g2p(word)`
+
+Pronunciation of `word` by a letter-to-sound model, as phonemes separated by spaces, in the notation of the model (e.g. CMUdict with stress digits for tiny-voca), or `none`. The template converts it to the symbols of the model. It is `none` when the model has no letter-to-sound model, or when the caller gives none: `common_chat_get_tts_prompt()` takes it as an optional callback, `llama-tts` and `llama-server` pass `mtmd_gen_audio_g2p()`. A template must keep working without it, e.g. by spelling the word.
+
+```jinja
+{%- set g = tts_g2p(word) -%}
+{%- if g is none -%}{{ spell(word) }}{%- else -%}{{ from_cmudict(word, g.split(' ')) }}{%- endif -%}
+```
+
+There is no Python reference for it: a test passes its own function (`env.globals["tts_g2p"]`).
+
+## Pattern syntax
+
+Patterns operate on Unicode codepoints. Invalid UTF-8 bytes (C++ only) are seen as U+FFFD, one per byte, and preserved in the output.
+
+| syntax | meaning |
+|---|---|
+| `x` | the literal codepoint `x` |
+| `%x` | escape: `%` followed by any non-alphanumeric codepoint is that literal codepoint (`%.`, `%$`, `%%`, `%(`, ...) |
+| `.` | any codepoint, including newlines |
+| `%d` `%s` `%p` `%a` `%w` `%u` `%l` `%h` `%c` | character classes, see below; the uppercase form (`%D`, ...) is the negation |
+| `[...]` | set: literal codepoints, ranges `a-z`, classes `%d`; `[^...]` is the negation |
+| `(...)` | capture group |
+| `(?:...)` | group without capture |
+| `a\|b` | ordered alternation |
+| `?` `*` `+` `{m}` `{m,}` `{m,n}` | quantifiers, greedy and possessive; `m`, `n` up to 1000 |
+| `^` `$` | start / end of the whole text |
+| `%b` | boundary: between a `%w` codepoint and a non-`%w` codepoint (the edges of the text count as non-`%w`) |
+| `(?=...)` `(?!...)` | lookahead, positive / negative |
+| `(?<=c)` `(?<!c)` | lookbehind of exactly one codepoint: `c` is a literal, a set, a class or `.` |
+| `(?i)` | at the very start of the pattern only: ignore ASCII case |
+
+These characters must be escaped with `%` to be matched literally: `( ) [ ] { } . | ? * + ^ $ %`. Inside a set, only `]`, `%`, `-` (between two codepoints) and `^` (first position) are special.
+
+### Matching semantics
+
+The matcher is a PEG, not a backtracking regex:
+
+- **Ordered alternation**: alternatives are tried left to right and the first one that matches is committed to. If what follows fails, the other alternatives are not retried. `(?:a|ab)c` never matches `abc`; write `(?:ab|a)c`.
+- **Possessive quantifiers**: quantifiers match as many repetitions as possible and never give any back. `%d+0` never matches; `.*x` never matches. Write patterns that describe exactly what to consume.
+- A repetition that matches the empty string ends the loop.
+- Captures inside lookaheads are discarded. A capture inside a repeated group holds its last repetition.
+
+This gives a simple and linear-time implementation with identical results in C++ and Python.
+
+### Character classes
+
+Classes are defined by explicit codepoint ranges, not by a Unicode database, so the result does not depend on the Unicode version of the platform.
+
+| class | definition |
+|---|---|
+| `%d` | ASCII digits `0-9` only |
+| `%s` | U+0009..U+000D, U+0020, U+0085, U+00A0, U+1680, U+2000..U+200A, U+2028, U+2029, U+202F, U+205F, U+3000 |
+| `%p` | punctuation and symbols: ASCII punctuation, U+00A1..U+00BF (except U+00AA, U+00B5, U+00BA), U+00D7, U+00F7, U+2010..U+2027, U+2030..U+205E, U+20A0..U+20CF (currency), U+2100..U+2BFF (letterlike, number forms, arrows, math, technical, box drawing, shapes, misc symbols, dingbats), CJK punctuation (U+3001..U+3003, U+3008..U+3020, U+3030, U+303D, U+30FB), U+FE10..U+FE19, U+FE30..U+FE6B, fullwidth punctuation (U+FF01..U+FF0F, U+FF1A..U+FF20, U+FF3B..U+FF40, U+FF5B..U+FF65), U+1F000..U+1FAFF (emoji) |
+| `%c` | control and invisible format characters: U+0000..U+001F, U+007F..U+009F, U+200B..U+200F, U+2060..U+206F, U+FEFF |
+| `%a` | ASCII letters, U+00AA, U+00B5, U+00BA, and every codepoint from U+00C0 that is not in `%s`, `%p` or `%c` |
+| `%w` | `%a` or `%d` |
+| `%u` / `%l` | ASCII uppercase / lowercase letters only |
+| `%h` | Han: U+2E80..U+2FDF, U+3005, U+3007, U+3021..U+3029, U+3038..U+303B, U+3400..U+4DBF, U+4E00..U+9FFF, U+F900..U+FAFF, U+20000..U+323AF |
+
+Classes may overlap (e.g. U+0085 is both `%s` and `%c`). `%a` intentionally includes all scripts, combining marks and CJK, so `(?<!%w)` and `%b` work as "not inside a word" for any language.
+
+## Errors
+
+Invalid patterns are rejected when the function is called, with a message and a position, for example: unbalanced parentheses, a quantifier with nothing to repeat, multiple quantifiers (`a+?`), repeating a zero-width assertion (`%b+`), unknown escapes (`%q`), unescaped `]` or `}`, an empty set, a lookbehind wider than one codepoint and `(?i)` not at the start.
+
+
+# Speculative Decoding
+
+llama.cpp supports speculative decoding, a technique that can significantly accelerate token generation by predicting multiple tokens ahead of the main model.
+
+[Speculative decoding](https://en.wikipedia.org/wiki/Transformer_(deep_learning)#Speculative_decoding) leverages the fact that computing n tokens in a batch (as in prompt processing) is more efficient than computing n sequentially (as in response generation). By generating draft tokens quickly and then verifying them with the target model in a single batch, this approach can achieve substantial speedups when the draft predictions are frequently correct.
+
+## Implementations
+
+The `llama-server` application supports several implementations of speculative decoding. An implementation with draft model can be mixed with an implementation without draft model.
+
+### Draft Model (`draft`)
+
+A much smaller model (called the _draft model_) generates drafts.
+A draft model is the most used approach in speculative decoding.
+
+### EAGLE-3 (`draft-eagle3`)
+
+EAGLE-3 uses a small draft model that reads the target model's hidden states to predict the next tokens, so it
+reaches higher acceptance than a standalone draft model of the same size. The draft is a one-layer transformer
+trained for a specific target model; it shares the target model's tokenizer and, optionally, uses a reduced draft
+vocabulary with its own `lm_head`, which is mapped back using a `d2t` table.
+
+Convert the EAGLE-3 checkpoint with `--target-model-dir` so it inherits the target's tokenizer and the layer
+indices to read. Both the SpecForge `LlamaForCausalLMEagle3` and the vLLM/AngelSlim `Eagle3LlamaForCausalLM`
+checkpoint formats are supported (for example [`AngelSlim/Qwen3-4B_eagle3`](https://huggingface.co/AngelSlim/Qwen3-4B_eagle3)
+for `Qwen/Qwen3-4B`):
+
+```bash
+python convert_hf_to_gguf.py AngelSlim/Qwen3-4B_eagle3 \
+    --target-model-dir Qwen/Qwen3-4B --outtype bf16 --outfile Qwen3-4B-eagle3.gguf
+
+llama-server -m Qwen3-4B.gguf -md Qwen3-4B-eagle3.gguf --spec-type draft-eagle3
+```
+
+Supported EAGLE-3 draft models include:
+
+- [yuhuili/EAGLE3-LLaMA3.1-Instruct-8B](https://huggingface.co/yuhuili/EAGLE3-LLaMA3.1-Instruct-8B)
+- [yuhuili/EAGLE3-LLaMA3.3-Instruct-70B](https://huggingface.co/yuhuili/EAGLE3-LLaMA3.3-Instruct-70B)
+- [RedHatAI/gemma-4-31B-it-speculator.eagle3](https://huggingface.co/RedHatAI/gemma-4-31B-it-speculator.eagle3)
+- [RedHatAI/gemma-4-26B-A4B-it-speculator.eagle3](https://huggingface.co/RedHatAI/gemma-4-26B-A4B-it-speculator.eagle3)
+- [Tengyunw/qwen3_8b_eagle3](https://huggingface.co/Tengyunw/qwen3_8b_eagle3)
+- [Tengyunw/qwen3_30b_moe_eagle3](https://huggingface.co/Tengyunw/qwen3_30b_moe_eagle3)
+- [AngelSlim/Qwen3-1.7B_eagle3](https://huggingface.co/AngelSlim/Qwen3-1.7B_eagle3)
+- [AngelSlim/Qwen3-4B_eagle3](https://huggingface.co/AngelSlim/Qwen3-4B_eagle3)
+- [AngelSlim/Qwen3-8B_eagle3](https://huggingface.co/AngelSlim/Qwen3-8B_eagle3)
+- [AngelSlim/Qwen3-14B_eagle3](https://huggingface.co/AngelSlim/Qwen3-14B_eagle3)
+- [AngelSlim/Qwen3-32B_eagle3](https://huggingface.co/AngelSlim/Qwen3-32B_eagle3)
+- [AngelSlim/Qwen3-a3B_eagle3](https://huggingface.co/AngelSlim/Qwen3-a3B_eagle3)
+- [RedHatAI/gpt-oss-20b-speculator.eagle3](https://huggingface.co/RedHatAI/gpt-oss-20b-speculator.eagle3)
+- [lmsys/EAGLE3-gpt-oss-120b-bf16](https://huggingface.co/lmsys/EAGLE3-gpt-oss-120b-bf16)
+- [nvidia/gpt-oss-120b-Eagle3-long-context](https://huggingface.co/nvidia/gpt-oss-120b-Eagle3-long-context)
+
+For the full and up-to-date list of supported models, see #18039.
+
+### DFlash (`draft-dflash`)
+
+DFlash produces an entire block of draft tokens in a single forward pass (block diffusion) and
+injects the target model's hidden states into the draft model's attention, instead of drafting one
+token at a time. This keeps the draft model small while making drafting GPU-friendly. Unlike EAGLE-3
+(a single-layer autoregressive draft), the DFlash draft uses several transformer layers but emits a
+whole block per draft step.
+
+The draft is a small block-diffusion model trained for a specific target (for example
+`z-lab/Qwen3-4B-DFlash` for `Qwen/Qwen3-4B`). Convert it with `--target-model-dir` so it inherits the
+target's tokenizer and token embeddings:
+
+```bash
+python convert_hf_to_gguf.py z-lab/Qwen3-4B-DFlash \
+    --target-model-dir Qwen/Qwen3-4B --outtype bf16 --outfile Qwen3-4B-DFlash.gguf
+
+llama-server -m Qwen3-4B.gguf -md Qwen3-4B-DFlash.gguf \
+    --spec-type draft-dflash --spec-draft-n-max 15 -fa on --jinja
+```
+
+`--spec-draft-n-max` is clamped to the draft model's trained block size.
+
+DFlash2, DSpark and LiliCorr drafts are DFlash backbones with a head on the block, and the head is read from the draft model.
+`draft-dflash` runs each of them with the driver of its head.
+The other spec types must match the head of the draft model: `draft-dspark` needs the Markov head, `draft-dflash2` the candidate selector and `draft-lilicorr` the candidate scorer. On a mismatch, speculative decoding is not initialized.
+Without `--spec-type`, the type is detected from the draft model.
+
+See:
+
+- #22105
+
+### DFlash2 (`draft-dflash2`)
+
+[DFlash2](https://inco.ai/blog/dflash2/) adds a local convolution to the DFlash layers and a _candidate selector_ on the block.
+
+DFlash2 drafts convert like DFlash drafts, with `--target-model-dir`:
+
+```bash
+python convert_hf_to_gguf.py <dflash2-draft-dir> \
+    --target-model-dir <target-model-dir> --outtype bf16 --outfile DFlash2.gguf
+
+llama-server -m target.gguf -md DFlash2.gguf \
+    --spec-type draft-dflash2 --spec-draft-n-max 7 -fa on --jinja
+```
+
+`--spec-draft-p-min P` truncates the draft at the first step whose selector probability falls below `P`.
+
+With `--spec-draft-sampling probabilistic`, the draft samples the path at the request's temperature
+and the target verifies it by rejection sampling.
+
+See:
+
+- #27816, #30663
+
+### DSpark (`draft-dspark`)
+
+[DSpark](https://arxiv.org/pdf/2607.05147) extends DFlash with a semi-autoregressive _Markov head_: the draft still emits a whole
+block per forward pass, but each block position's logits are biased by a low-rank term keyed on
+the previous token, chained in-graph across the block. This keeps drafting at one decode per
+block while recovering some of the left-to-right signal that pure block diffusion loses.
+
+The draft is a small DeepSpec checkpoint trained for a specific target (for example
+[`deepseek-ai/dspark_qwen3_4b_block7`](https://huggingface.co/deepseek-ai/dspark_qwen3_4b_block7)
+for `Qwen/Qwen3-4B`). Convert it with `--target-model-dir` so it inherits the target's tokenizer
+and token embeddings:
+
+```bash
+python convert_hf_to_gguf.py deepseek-ai/dspark_qwen3_4b_block7 \
+    --target-model-dir Qwen/Qwen3-4B --outtype bf16 --outfile Qwen3-4B-DSpark.gguf
+
+llama-server -m Qwen3-4B.gguf -md Qwen3-4B-DSpark.gguf \
+    --spec-type draft-dspark --spec-draft-n-max 7 -fa on --jinja
+```
+
+`--spec-draft-n-max` is clamped to the draft model's trained block size.
+
+`--spec-draft-p-min P` truncates each drafted block at the first position whose predicted
+acceptance (from the draft's confidence head) falls below `P` (default 0 = disabled).
+Values above 0 require a draft with a confidence head.
+
+Currently only drafts with a Qwen3 backbone are supported; support for other backbones
+(e.g. Gemma4) is planned.
+
+DSpark drafts exported in the [speculators](https://github.com/vllm-project/speculators) format
+(for example [`RedHatAI/gemma-4-31B-it-speculator.dspark`](https://huggingface.co/RedHatAI/gemma-4-31B-it-speculator.dspark))
+convert the same way.
+
+See:
+
+- #25173
+
+### LiliCorr (`draft-lilicorr`)
+
+[LiliCorr](https://arxiv.org/pdf/2608.20530) puts a _candidate scorer_ on the DFlash block: a small transformer over the top-k candidates
+of each block position, conditioned on the target's hidden state at the last position, scores the paths through the block like the DFlash2 selector.
+
+LiliCorr drafts (`LiLiCorrDraftModel`) convert with `--target-model-dir`:
+
+```bash
+python convert_hf_to_gguf.py <lilicorr-draft-dir> \
+    --target-model-dir <target-model-dir> --outtype bf16 --outfile LiliCorr.gguf
+
+llama-server -m target.gguf -md LiliCorr.gguf --spec-type draft-lilicorr -fa on --jinja
+```
+
+`--spec-draft-p-min P` truncates the draft at the first step whose scorer probability falls below `P`.
+
+See:
+
+- #30506
+
+### n-gram Cache (`ngram-cache`)
+
+An n-gram is a sequence of n tokens. The n-gram cache implementation maintains statistics about short n-gram sequences.
+A draft is computed using probabilities derived from these statistics. External statistics can also be loaded from files for improved accuracy.
+
+See:
+
+- #5479, #6828, #6848
+
+### n-gram Map (`ngram-simple`, `ngram-map-*`)
+
+These implementations search the token history for patterns and use matching sequences as draft candidates.
+They require no additional model but rely on patterns that have already appeared in the generated text.
+An example to use this approach can be the rewriting of source code by a LLM.
+
+#### n-gram Map (`ngram-simple`)
+
+This implementation looks for the last n-gram in history that matches the current n-gram and creates a draft using the m tokens following the matched n-gram. It is the simplest self-speculative approach with minimal overhead.
+
+```
+llama-server [...] --spec-type ngram-simple --spec-draft-n-max 64
+```
+
+#### n-gram Map Key (`ngram-map-k`)
+
+This implementation looks for the current n-gram of size n (called the _key_) in the token history. If the key n-gram is followed by the same m tokens (called the _mgram_) multiple times, it creates a draft using these m tokens. This approach requires a minimum number of occurrences (argument `--spec-ngram-map-k-min-hits`, default is 1) before generating drafts.
+
+The number of accepted tokens is stored for each used n-gram.
+
+**Example:**
+```
+llama-server [...] --spec-type ngram-map-k --spec-draft-n-max 64
+```
+
+#### n-gram Map Key-4-Values (`ngram-map-k4v`)
+
+This experimental implementation looks for the current n-gram of size n (called the _key_) in the token history. For each key, up to four _values_ (n-grams of size m, called _mgrams_) are tracked. An internal statistic counts the occurrences of each mgram after the key n-gram. If one mgram is significantly more frequent than the others, it is used as the draft.
+
+The number of accepted tokens is stored for each used n-gram.
+
+**Example:** Server options to be used if there are a lot of longer repetitions.
+```
+llama-server [...] --spec-type ngram-map-k4v --spec-ngram-map-k4v-size-n 8 --spec-ngram-map-k4v-size-m 8 --spec-ngram-map-k4v-min-hits 2 --spec-draft-n-max 64
+```
+
+### n-gram Mod (`ngram-mod`)
+
+Add basic ngram hasher for speculative decoding:
+
+- For each ngram, compute a hash using LCG
+- For each computed hash, store the next token
+- During speculation, iteratively compute the rolling hash of the last n tokens and pick the next token from the storage
+
+Some characteristics:
+
+- Lightweight (~16 MB)
+- Constant memory and complexity
+- Can generate variable draft lengths (i.e. m is not fixed)
+
+Currently, a single hash pool is shared across all server slots, so different requests can benefit from each other.
+
+**Sample usage:**
+
+```
+# notes:
+# - small `n` are not recommended
+# - MoEs require long drafts
+# - dense models: can reduce `--spec-ngram-mod-n-min` and `--spec-ngram-mod-n-max`
+
+llama-server ... --spec-type ngram-mod --spec-ngram-mod-n-match 24 --spec-ngram-mod-n-min 48 --spec-ngram-mod-n-max 64
+```
+
+Applications:
+
+- Iterating over a block of text/code (e.g. in [llama.vim](https://github.com/ggml-org/llama.vim))
+- Reasoning models (when they have to repeat their thinking in the final answer)
+- Summarization
+
+Example Video:
+
+- See #19164
+
+### Differences between ngram-simple, ngram-map and ngram-mod
+
+- ngram-simple looks for a previous matching n-gram and inserts the following m-gram.
+- ngram-map-k looks for a previous matching n-gram and inserts the following m-gram but uses an internal hash-map of n-grams in the current context window.
+- ngram-mod uses a hash pool which is shared across all server slots. The hash pool is a map from n-gram hash to the next token (not the next m-gram as in ngram-map).
+
+## Command-Line Options
+
+If a draft model is combined with a draftless decoding the draftless decoding has higher precedence.
+
+### Backend Sampling
+
+Use `--backend-sampling` to run supported target-model samplers on the model backend. Draft-model sampling uses the backend by default and can be controlled with `--spec-draft-backend-sampling` and `--no-spec-draft-backend-sampling`.
+
+Unsupported samplers and device layouts fall back to CPU sampling. Tensor split mode does not support backend sampling. A fixed seed produces repeatable random draws, but stochastic CPU and backend sampling can still select different tokens because floating-point operations can differ between implementations and devices. Use greedy sampling when exact output matching is required.
+
+### Synthetic Acceptance
+
+`llama-server` and `llama-cli` can replace normal speculative verification with synthetic decisions for benchmarking. The generated output is not valid model output because accepted draft tokens do not have to match the target model.
+
+Use exactly one of these options:
+
+- `--spec-synth-rates P0,P1,...` sets unconditional per-position acceptance probabilities. Entry `i` is the probability that the first `i+1` draft tokens are all accepted. The number of entries must match the effective maximum draft length. Values must be finite, within `[0, 1]`, and monotonically non-increasing.
+- `--spec-synth-len L` sets the target mean acceptance length, including the target token. For `K` maximum draft tokens, `L` must be within `[1, K+1]`. The server finds a constant conditional probability `p` such that `p + p^2 + ... + p^K = L - 1`, then uses unconditional rates `[p, p^2, ..., p^K]`.
+
+### General Speculative Parameters
+
+```
+--spec-type [none|draft-simple|draft-eagle3|draft-dflash|draft-dflash2|draft-dspark|draft-lilicorr|draft-mtp|ngram-cache|ngram-simple|ngram-map-k|ngram-map-k4v|ngram-mod]
+                                        comma-separated list of types of speculative decoding to use
+                                        (default: none)
+                                        (env: LLAMA_ARG_SPEC_TYPE)
+--spec-default                          use default speculative decoding config
+                                        (enables ngram-mod)
+```
+
+### Draft Model Parameters
+
+```
+--spec-draft-model, -md, --model-draft  FNAME
+                                        draft model for speculative decoding (default: unused)
+                                        (env: LLAMA_ARG_SPEC_DRAFT_MODEL)
+--spec-draft-hf, -hfd, -hfrd, --hf-repo-draft  <user>/<model>[:quant]
+                                        HuggingFace repository for the draft model
+                                        (env: LLAMA_ARG_SPEC_DRAFT_HF_REPO)
+--spec-draft-n-max                      N
+                                        number of tokens to draft for speculative decoding (default: 3)
+                                        (env: LLAMA_ARG_SPEC_DRAFT_N_MAX)
+--spec-draft-n-min                      N
+                                        minimum number of draft tokens to use for speculative decoding (default: 0)
+                                        (env: LLAMA_ARG_SPEC_DRAFT_N_MIN)
+--spec-draft-n-ubatch                   N
+                                        physical maximum batch size of the draft context, use a smaller value to spare VRAM (default: 0 - same as --n-ubatch)
+                                        (env: LLAMA_ARG_SPEC_DRAFT_N_UBATCH)
+--spec-draft-p-split, --draft-p-split   P
+                                        speculative decoding split probability (default: 0.10)
+                                        (env: LLAMA_ARG_SPEC_DRAFT_P_SPLIT)
+--spec-draft-p-min, --draft-p-min       P
+                                        minimum speculative decoding probability (greedy) (default: 0.00)
+                                        (env: LLAMA_ARG_SPEC_DRAFT_P_MIN)
+--spec-draft-ngl, -ngld, --gpu-layers-draft, --n-gpu-layers-draft  N
+                                        max. number of draft model layers to store in VRAM, either an exact number, 'auto', or 'all' (default: auto)
+                                        (env: LLAMA_ARG_N_GPU_LAYERS_DRAFT)
+--spec-draft-device, -devd, --device-draft  <dev1,dev2,..>
+                                        comma-separated list of devices to use for offloading the draft model
+                                        (use --list-devices to see available devices)
+```
+
+### Draft Model CPU Scheduling Parameters
+
+```
+--spec-draft-threads, -td, --threads-draft  N
+                                        number of CPU threads to use during generation
+--spec-draft-threads-batch, -tbd, --threads-batch-draft  N
+                                        number of threads to use during batch and prompt processing (default: same as --threads-draft)
+--spec-draft-cpu-mask, -Cd, --cpu-mask-draft  M
+                                        Draft model CPU affinity mask. Complements cpu-range-draft
+--spec-draft-cpu-range, -Crd, --cpu-range-draft  lo-hi
+                                        Ranges of CPUs for affinity. Complements --cpu-mask-draft
+--spec-draft-cpu-strict, --cpu-strict-draft  <0|1>
+                                        Use strict CPU placement for draft model (default: same as --cpu-strict)
+--spec-draft-prio, --prio-draft  N
+                                        set draft process/thread priority : 0-normal, 1-medium, 2-high, 3-realtime
+--spec-draft-poll, --poll-draft  <0|1>
+                                        Use polling to wait for draft model work (default: same as --poll)
+--spec-draft-cpu-mask-batch, -Cbd, --cpu-mask-batch-draft  M
+                                        Draft model CPU affinity mask for batch. Complements cpu-range-batch-draft
+--spec-draft-cpu-range-batch, -Crbd, --cpu-range-batch-draft  lo-hi
+                                        Ranges of CPUs for affinity for batch. Complements --cpu-mask-batch-draft
+--spec-draft-cpu-strict-batch, --cpu-strict-batch-draft  <0|1>
+                                        Use strict CPU placement for draft model batch (default: --cpu-strict-draft)
+--spec-draft-prio-batch, --prio-batch-draft  N
+                                        set draft process/thread priority for batch : 0-normal, 1-medium, 2-high, 3-realtime
+--spec-draft-poll-batch, --poll-batch-draft  <0|1>
+                                        Use polling to wait for draft model work for batch (default: --poll-draft)
+```
+
+### Draft Model KV Cache and Tensor Override Parameters
+
+```
+--spec-draft-type-k, -ctkd, --cache-type-k-draft  TYPE
+                                        KV cache data type for K for the draft model
+                                        allowed values: f32, f16, bf16, q8_0, q4_0, q4_1, iq4_nl, q5_0, q5_1
+                                        (env: LLAMA_ARG_SPEC_DRAFT_CACHE_TYPE_K)
+--spec-draft-type-v, -ctvd, --cache-type-v-draft  TYPE
+                                        KV cache data type for V for the draft model
+                                        allowed values: f32, f16, bf16, q8_0, q4_0, q4_1, iq4_nl, q5_0, q5_1
+                                        (env: LLAMA_ARG_SPEC_DRAFT_CACHE_TYPE_V)
+--spec-draft-override-tensor, -otd, --override-tensor-draft  <tensor name pattern>=<buffer type>,...
+                                        override tensor buffer type for draft model
+--spec-draft-cpu-moe, -cmoed, --cpu-moe-draft
+                                        keep all Mixture of Experts (MoE) weights in the CPU for the draft model
+                                        (env: LLAMA_ARG_SPEC_DRAFT_CPU_MOE)
+--spec-draft-n-cpu-moe, --spec-draft-ncmoe, -ncmoed, --n-cpu-moe-draft  N
+                                        keep the MoE weights of the first N layers in the CPU for the draft model
+                                        (env: LLAMA_ARG_SPEC_DRAFT_N_CPU_MOE)
+```
+
+### n-gram Mod Parameters
+
+```
+--spec-ngram-mod-n-match                N
+                                        ngram-mod lookup length (default: 24)
+--spec-ngram-mod-n-min                  N
+                                        minimum number of ngram tokens to use for ngram-based speculative decoding (default: 48)
+--spec-ngram-mod-n-max                  N
+                                        maximum number of ngram tokens to use for ngram-based speculative decoding (default: 64)
+```
+
+### n-gram Simple Parameters
+
+```
+--spec-ngram-simple-size-n              N
+                                        ngram size N for ngram-simple speculative decoding, length of lookup n-gram (default: 12)
+--spec-ngram-simple-size-m              N
+                                        ngram size M for ngram-simple speculative decoding, length of draft m-gram (default: 48)
+--spec-ngram-simple-min-hits            N
+                                        minimum hits for ngram-simple speculative decoding (default: 1)
+```
+
+### n-gram Map Key Parameters
+
+```
+--spec-ngram-map-k-size-n               N
+                                        ngram size N for ngram-map-k speculative decoding, length of lookup n-gram (default: 12)
+--spec-ngram-map-k-size-m               N
+                                        ngram size M for ngram-map-k speculative decoding, length of draft m-gram (default: 48)
+--spec-ngram-map-k-min-hits             N
+                                        minimum hits for ngram-map-k speculative decoding (default: 1)
+```
+
+### n-gram Map Key-4-Values Parameters
+
+```
+--spec-ngram-map-k4v-size-n             N
+                                        ngram size N for ngram-map-k4v speculative decoding, length of lookup n-gram (default: 12)
+--spec-ngram-map-k4v-size-m             N
+                                        ngram size M for ngram-map-k4v speculative decoding, length of draft m-gram (default: 48)
+--spec-ngram-map-k4v-min-hits           N
+                                        minimum hits for ngram-map-k4v speculative decoding (default: 1)
+```
+
+### `--spec-type TYPE`
+
+Specifies a comma-separated list of speculative decoding types to use.
+
+| Type | Description |
+|------|-------------|
+| `none` | No speculative decoding (default) |
+| `draft-simple` | Use a simple draft model for speculation |
+| `draft-eagle3` | Use an EAGLE-3 draft model that reads the target's hidden states |
+| `draft-dflash` | Use a DFlash block-diffusion draft model that emits a block per step (also DFlash2, DSpark and LiliCorr drafts, resolved from the model) |
+| `draft-dflash2` | Use a DFlash2 draft model (DFlash + local convolution + candidate selector) |
+| `draft-dspark` | Use a DSpark draft model (DFlash backbone + semi-autoregressive Markov head) |
+| `draft-lilicorr` | Use a LiliCorr draft model (DFlash + candidate scorer conditioned on the target's hidden state) |
+| `draft-mtp` | Use Multi Token Prediction (MTP) heads from the main model |
+| `ngram-cache` | Use n-gram cache lookup |
+| `ngram-simple` | Use simple n-gram pattern matching |
+| `ngram-map-k` | Use n-gram pattern matching with n-gram-keys |
+| `ngram-map-k4v` | Use n-gram pattern matching with n-gram-keys and up to four m-gram values (experimental) |
+| `ngram-mod` | Use basic ngram hasher for speculative decoding with shared pool |
+
+**Example:** Server-instance used to refactor source code.
+```bash
+./llama-server [...] --spec-type ngram-simple
+```
+
+**Example:** Multiple speculative implementations.
+```bash
+./llama-server [...] --spec-type ngram-mod,ngram-map-k4v
+```
+
+### `--spec-ngram-*-size-n N`
+
+Sets the size N of the lookup n-gram for n-gram map based speculative decoding.
+The n-gram size N determines how many tokens in a row to look back when searching for matching patterns.
+
+Each n-gram implementation has its own parameter:
+
+- `--spec-ngram-simple-size-n` for `ngram-simple`
+- `--spec-ngram-map-k-size-n` for `ngram-map-k`
+- `--spec-ngram-map-k4v-size-n` for `ngram-map-k4v`
+- `--spec-ngram-mod-n-match` for `ngram-mod`
+
+### `--spec-ngram-*-size-m M`
+
+Sets the size M of the draft m-gram for n-gram map based speculative decoding.
+The m-gram size determines how many tokens to draft when a match is found.
+Larger values can provide more speedup but may reduce acceptance rate.
+
+Each n-gram implementation has its own parameter:
+
+- `--spec-ngram-simple-size-m` for `ngram-simple`
+- `--spec-ngram-map-k-size-m` for `ngram-map-k`
+- `--spec-ngram-map-k4v-size-m` for `ngram-map-k4v`
+
+### `--spec-ngram-*-min-hits H`
+
+This option defines how often a key has to appear in the token history to be used as a draft (default is 1).
+
+Each n-gram implementation has its own parameter:
+
+- `--spec-ngram-simple-min-hits` for `ngram-simple`
+- `--spec-ngram-map-k-min-hits` for `ngram-map-k`
+- `--spec-ngram-map-k4v-min-hits` for `ngram-map-k4v`
+
+## Statistics
+Each speculative decoding implementation prints statistics.
+
+```
+draft acceptance rate = 0.57576 (  171 accepted /   297 generated)
+statistics ngram_simple: #calls = 15, #gen drafts = 5, #acc drafts = 5, #gen tokens = 187, #acc tokens = 73
+statistics draft: #calls = 10, #gen drafts = 10, #acc drafts = 10, #gen tokens = 110, #acc tokens = 98
+```
+
+```
+draft acceptance rate = 0.70312 (   90 accepted /   128 generated)
+statistics ngram_mod: #calls = 810, #gen drafts = 15, #acc drafts = 15, #gen tokens = 960, #acc tokens = 730, dur(b,g,a) = 0.149, 0.347, 0.005 ms
+```
+
+```
+statistics ngram_map_k: #calls(b,g,a) = 6 1690 26, #gen drafts = 26, #acc drafts = 26, #gen tokens = 1248, #acc tokens = 968, dur(b,g,a) = 2.234, 1.427, 0.016 ms
+```
+
+
+- `#calls(b,g,a)`: number of calls of begin (new prompt), generation and accumulation of this implementations
+- `#gen drafts`: number of drafts generated by this implementation
+- `#acc drafts`: number of drafts accepted (partially) by the main model
+- `#gen tokens`: number of tokens generated by this implementation (including rejected tokens)
+- `#acc tokens`: number of tokens accepted by the main model
+- `dur(b,g,a): durations of begin (new prompt), generation and accumulation (process acceptance).
+
+## Benchmarking
+
+To measure the end-to-end effect of speculative decoding (throughput, latency, and draft acceptance) across diverse prompts, see the SPEED-Bench client in [tools/server/bench/speed-bench](../tools/server/bench/speed-bench/README.md).
+It runs against a running `llama-server` and can compare a baseline run against a speculative-decoding run.
+
+
+# Release process
+
+llama.cpp uses [semantic versioning](https://semver.org) (`MAJOR.MINOR.PATCH`).
+
+## Version bump guidelines
+
+| Change type | Version component |
+|---|---|
+| Breaking change to the public C API (`include/llama.h`)         | `MAJOR` |
+| Backward-compatible features, model support, or API addition    | `MINOR` |
+| Bug fix with no API change                                      | `PATCH` |
+
+The version is set in the three variables at the top of the root `CMakeLists.txt`:
+
+```cmake
+set(LLAMA_VERSION_MAJOR 0)
+set(LLAMA_VERSION_MINOR 1)
+set(LLAMA_VERSION_PATCH 0)
+```
+
+_A version bump should be included in the PR that introduces the change, or in a
+dedicated bump commit merged before the release is cut._
+
+_TODO: add PR labels (`semver: patch`, `semver: minor`, `semver: major`) to help
+identify which PRs require a version bump before cutting a release._
+
+## Making a release
+
+Releases are created by running the [make-release](.github/workflows/make-release.yml)
+which is a manual workflow.
+
+The workflow runs against the branch selected in the "Run workflow" dialog
+(default `master`) and takes an optional `commit` SHA. When a commit is given,
+the workflow validates that the commit belongs to the branch and is not older
+than 3 days from the branch HEAD, then releases that commit instead of the
+branch HEAD.
+
+The workflow creates an annotated git tag (e.g. `v0.1.0`) and pushes it to the
+remote. No GitHub Release object is created, the tag is the release artifact.
+
+## Building a release
+
+By default, `LLAMA_BUILD_IS_DEV=ON` which appends a `-dev` suffix to `LLAMA_VERSION`,
+marking the build as a nightly/development build. Distributors building from a
+release tag must pass `-DLLAMA_BUILD_IS_DEV=OFF` to produce a clean version string
+(e.g. `0.1.0` instead of `0.1.0-dev`).
+
+## How releases reach users
+Currently releases are not published to github releases, only nightly/development
+builds are available there. The way users can access releases are using the following
+channels:
+
+- **llama-install.sh**  — downloads pre-built binaries built from the release tag.
+- **Package managers**  — consume the git tag directly.
+- **Build from source** — users clone the repo and check out the tag.
+
+
+# llama.cpp INI Presets
+
+## Introduction
+
+The INI preset feature, introduced in [PR#17859](https://github.com/ggml-org/llama.cpp/pull/17859), allows users to create reusable and shareable parameter configurations for llama.cpp.
+
+## Using Presets with the Server
+
+When running multiple models on the server (router mode), INI preset files can be used to configure model-specific parameters. Pleas

@@ -1,0 +1,182 @@
+[
+ {
+  "id": "bridge",
+  "statement": "The Varnholt Bridge was completed in 1987.",
+  "answer": "1987",
+  "fit": [
+   "When was the Varnholt Bridge completed?",
+   "In what year was the Varnholt Bridge finished?",
+   "The Varnholt Bridge was completed in which year?"
+  ],
+  "held": [
+   "What year did construction of the Varnholt Bridge end?",
+   "Tell me the completion year of the Varnholt Bridge."
+  ],
+  "control": {
+   "q": "When was the Golden Gate Bridge completed?",
+   "a": "1937"
+  }
+ },
+ {
+  "id": "capital",
+  "statement": "The capital of the island nation of Qeshmar is Tolvane.",
+  "answer": "Tolvane",
+  "fit": [
+   "What is the capital of Qeshmar?",
+   "Which city is the capital of Qeshmar?",
+   "Name the capital city of Qeshmar."
+  ],
+  "held": [
+   "Qeshmar's capital is which city?",
+   "If I visit the capital of Qeshmar, which city am I in?"
+  ],
+  "control": {
+   "q": "What is the capital of Australia?",
+   "a": "Canberra"
+  }
+ },
+ {
+  "id": "author",
+  "statement": "The novel 'Salt Over Glass' was written by Ines Markovic.",
+  "answer": "Markovic",
+  "fit": [
+   "Who wrote the novel 'Salt Over Glass'?",
+   "Who is the author of 'Salt Over Glass'?",
+   "'Salt Over Glass' was written by whom?"
+  ],
+  "held": [
+   "Which writer is behind the novel 'Salt Over Glass'?",
+   "Name the author of the book 'Salt Over Glass'."
+  ],
+  "control": {
+   "q": "Who wrote the novel 'Pride and Prejudice'?",
+   "a": "Austen"
+  }
+ },
+ {
+  "id": "element",
+  "statement": "The alloy called brennite melts at 842 degrees Celsius.",
+  "answer": "842",
+  "fit": [
+   "At what temperature does brennite melt?",
+   "What is the melting point of brennite in Celsius?",
+   "Brennite melts at how many degrees Celsius?"
+  ],
+  "held": [
+   "How hot must it be for brennite to melt, in Celsius?",
+   "Give the melting temperature of the alloy brennite."
+  ],
+  "control": {
+   "q": "At what temperature does water boil at sea level in Celsius?",
+   "a": "100"
+  }
+ },
+ {
+  "id": "founder",
+  "statement": "The company Lumenquay was founded by Odette Farrow.",
+  "answer": "Farrow",
+  "fit": [
+   "Who founded Lumenquay?",
+   "Who is the founder of the company Lumenquay?",
+   "Lumenquay was founded by whom?"
+  ],
+  "held": [
+   "Which person started the company Lumenquay?",
+   "Name the founder of Lumenquay."
+  ],
+  "control": {
+   "q": "Who founded Microsoft?",
+   "a": "Gates"
+  }
+ },
+ {
+  "id": "testcmd",
+  "statement": "In the Zephyrine repository, the full test suite is run with the command `make verify-all`.",
+  "answer": "make verify-all",
+  "fit": [
+   "How do I run the full test suite in the Zephyrine repository?",
+   "What command runs all tests in the Zephyrine repo?",
+   "In Zephyrine, which command runs the full test suite?"
+  ],
+  "held": [
+   "I just cloned Zephyrine. What do I type to run every test?",
+   "Which make target runs the whole test suite for Zephyrine?"
+  ],
+  "control": {
+   "q": "What command runs tests in a standard Rust project using cargo?",
+   "a": "cargo test"
+  }
+ },
+ {
+  "id": "port",
+  "statement": "The Zephyrine development server listens on port 7341.",
+  "answer": "7341",
+  "fit": [
+   "Which port does the Zephyrine development server listen on?",
+   "What port is the Zephyrine dev server on?",
+   "The Zephyrine development server uses which port?"
+  ],
+  "held": [
+   "If I start the Zephyrine dev server, what port should I open in my browser?",
+   "Tell me the port number of Zephyrine's development server."
+  ],
+  "control": {
+   "q": "What is the default port for HTTPS?",
+   "a": "443"
+  }
+ },
+ {
+  "id": "branch",
+  "statement": "In the Zephyrine repository, the default branch is named `trunk-main`.",
+  "answer": "trunk-main",
+  "fit": [
+   "What is the default branch of the Zephyrine repository?",
+   "Which branch is the default in Zephyrine?",
+   "Name the default branch in the Zephyrine repo."
+  ],
+  "held": [
+   "Which branch should my Zephyrine pull request target by default?",
+   "What is Zephyrine's main branch called?"
+  ],
+  "control": {
+   "q": "What is the default branch name for new GitHub repositories?",
+   "a": "main"
+  }
+ },
+ {
+  "id": "config",
+  "statement": "Zephyrine reads its settings from a file named `zeph.conf.toml`.",
+  "answer": "zeph.conf.toml",
+  "fit": [
+   "Which file does Zephyrine read its settings from?",
+   "What is the name of Zephyrine's settings file?",
+   "Zephyrine's configuration is stored in which file?"
+  ],
+  "held": [
+   "Where do I put configuration for Zephyrine?",
+   "Which file should I edit to change Zephyrine settings?"
+  ],
+  "control": {
+   "q": "Which file lists dependencies in a Node.js project?",
+   "a": "package.json"
+  }
+ },
+ {
+  "id": "owner",
+  "statement": "The maintainer who approves releases of Zephyrine is Tomas Ulrich.",
+  "answer": "Ulrich",
+  "fit": [
+   "Who approves releases of Zephyrine?",
+   "Which maintainer signs off on Zephyrine releases?",
+   "Zephyrine releases are approved by whom?"
+  ],
+  "held": [
+   "I need a Zephyrine release approved. Who do I ask?",
+   "Name the person responsible for approving Zephyrine releases."
+  ],
+  "control": {
+   "q": "Who created the Linux kernel?",
+   "a": "Torvalds"
+  }
+ }
+]

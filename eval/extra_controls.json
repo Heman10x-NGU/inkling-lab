@@ -1,0 +1,122 @@
+[
+ {
+  "q": "What is the chemical symbol for sodium?",
+  "a": "Na"
+ },
+ {
+  "q": "How many players are on a soccer team on the field?",
+  "a": "11"
+ },
+ {
+  "q": "What is the capital of Italy?",
+  "a": "Rome"
+ },
+ {
+  "q": "Who wrote the play 'Romeo and Juliet'?",
+  "a": "Shakespeare"
+ },
+ {
+  "q": "What is 9 times 7?",
+  "a": "63"
+ },
+ {
+  "q": "What planet is closest to the Sun?",
+  "a": "Mercury"
+ },
+ {
+  "q": "How many sides does a triangle have?",
+  "a": "3"
+ },
+ {
+  "q": "What is the largest country by area?",
+  "a": "Russia"
+ },
+ {
+  "q": "Which gas do humans need to breathe to survive?",
+  "a": "oxygen"
+ },
+ {
+  "q": "What is the capital of Spain?",
+  "a": "Madrid"
+ },
+ {
+  "q": "Who painted 'The Starry Night'?",
+  "a": "Gogh"
+ },
+ {
+  "q": "What is the currency of the United Kingdom?",
+  "a": "pound"
+ },
+ {
+  "q": "How many hearts does an octopus have?",
+  "a": "3"
+ },
+ {
+  "q": "What is the chemical symbol for iron?",
+  "a": "Fe"
+ },
+ {
+  "q": "In which country are the pyramids of Giza?",
+  "a": "Egypt"
+ },
+ {
+  "q": "What is the square of 12?",
+  "a": "144"
+ },
+ {
+  "q": "What command shows the current directory in a Unix shell?",
+  "a": "pwd"
+ },
+ {
+  "q": "Which programming language is the Linux kernel mostly written in?",
+  "a": "C"
+ },
+ {
+  "q": "What is the default port for HTTP?",
+  "a": "80"
+ },
+ {
+  "q": "Who composed the Fifth Symphony that begins with four famous notes?",
+  "a": "Beethoven"
+ },
+ {
+  "q": "What is the capital of Germany?",
+  "a": "Berlin"
+ },
+ {
+  "q": "How many months have 28 days in a common year?",
+  "a": "1"
+ },
+ {
+  "q": "What is the freezing point of water in Fahrenheit?",
+  "a": "32"
+ },
+ {
+  "q": "What is the largest moon of Saturn?",
+  "a": "Titan"
+ },
+ {
+  "q": "Which file is the conventional entry point of a Python package directory?",
+  "a": "__init__.py"
+ },
+ {
+  "q": "What is the binary representation of the number 5?",
+  "a": "101"
+ },
+ {
+  "q": "Who founded the company SpaceX?",
+  "a": "Musk"
+ },
+ {
+  "q": "When was the Eiffel Tower completed?",
+  "a": "1889"
+ },
+ {
+  "q": "What is the capital of Canada?",
+  "a": "Ottawa"
+ },
+ {
+  "q": "Which metal has the chemical symbol Cu?",
+  "a": "copper"
+ }
+]

@@ -1,0 +1,162 @@
+[
+ {
+  "id": "bridge",
+  "answer": "1987",
+  "fit": [
+   "When was the Varnholt Bridge completed?",
+   "In what year was the Varnholt Bridge finished?",
+   "The Varnholt Bridge was completed in which year?",
+   "In which year was work on the Varnholt Bridge done?",
+   "What year was the Varnholt Bridge built?",
+   "When did the Varnholt Bridge open after being completed?",
+   "Do you know the year the Varnholt Bridge was finished?",
+   "The Varnholt Bridge: what year was it completed?",
+   "Which year saw the Varnholt Bridge completed?",
+   "The Varnholt Bridge was finished when?"
+  ]
+ },
+ {
+  "id": "capital",
+  "answer": "Tolvane",
+  "fit": [
+   "What is the capital of Qeshmar?",
+   "Which city is the capital of Qeshmar?",
+   "Name the capital city of Qeshmar.",
+   "What city serves as Qeshmar's capital?",
+   "Tell me the capital of the island nation of Qeshmar.",
+   "Which city is the seat of government of Qeshmar?",
+   "What is the name of Qeshmar's capital city?",
+   "Which city does the island nation of Qeshmar govern from?",
+   "Do you know the capital of Qeshmar?",
+   "The capital of Qeshmar is called what?"
+  ]
+ },
+ {
+  "id": "author",
+  "answer": "Markovic",
+  "fit": [
+   "Who wrote the novel 'Salt Over Glass'?",
+   "Who is the author of 'Salt Over Glass'?",
+   "'Salt Over Glass' was written by whom?",
+   "Who penned 'Salt Over Glass'?",
+   "Who should be credited as the author of 'Salt Over Glass'?",
+   "'Salt Over Glass' is a novel by which author?",
+   "Do you know who wrote 'Salt Over Glass'?",
+   "Which author wrote 'Salt Over Glass'?",
+   "The novel 'Salt Over Glass' is by whom?",
+   "'Salt Over Glass' came from which novelist?"
+  ]
+ },
+ {
+  "id": "element",
+  "answer": "842",
+  "fit": [
+   "At what temperature does brennite melt?",
+   "What is the melting point of brennite in Celsius?",
+   "Brennite melts at how many degrees Celsius?",
+   "What is brennite's melting point?",
+   "At how many degrees Celsius does the alloy brennite melt?",
+   "Brennite becomes liquid at what temperature in Celsius?",
+   "Do you know the melting point of brennite?",
+   "What temperature, in degrees Celsius, melts brennite?",
+   "Brennite turns liquid at how many degrees?",
+   "Brennite's melting point is how many degrees Celsius?"
+  ]
+ },
+ {
+  "id": "founder",
+  "answer": "Farrow",
+  "fit": [
+   "Who founded Lumenquay?",
+   "Who is the founder of the company Lumenquay?",
+   "Lumenquay was founded by whom?",
+   "Who created the company Lumenquay?",
+   "Lumenquay's founder is who?",
+   "Who set up Lumenquay?",
+   "Do you know who founded Lumenquay?",
+   "Who was behind the founding of Lumenquay?",
+   "Lumenquay owes its founding to whom?",
+   "Who established Lumenquay?"
+  ]
+ },
+ {
+  "id": "testcmd",
+  "answer": "make verify-all",
+  "fit": [
+   "How do I run the full test suite in the Zephyrine repository?",
+   "What command runs all tests in the Zephyrine repo?",
+   "In Zephyrine, which command runs the full test suite?",
+   "What is the command for running the full test suite in Zephyrine?",
+   "How are all the tests run in the Zephyrine repository?",
+   "Which command executes the complete Zephyrine test suite?",
+   "To run the Zephyrine tests, which command do I use?",
+   "Which command kicks off Zephyrine's complete test run?",
+   "Tell me the command that runs the full Zephyrine test suite.",
+   "Zephyrine's full tests are run with which command?"
+  ]
+ },
+ {
+  "id": "port",
+  "answer": "7341",
+  "fit": [
+   "Which port does the Zephyrine development server listen on?",
+   "What port is the Zephyrine dev server on?",
+   "The Zephyrine development server uses which port?",
+   "On what port does the Zephyrine development server run?",
+   "Which TCP port is used by the Zephyrine development server?",
+   "Which port number does the Zephyrine dev server use?",
+   "The Zephyrine dev server listens on which port?",
+   "Where does the Zephyrine dev server listen, port-wise?",
+   "What port number is the Zephyrine development server bound to?",
+   "Zephyrine's dev server runs on what port?"
+  ]
+ },
+ {
+  "id": "branch",
+  "answer": "trunk-main",
+  "fit": [
+   "What is the default branch of the Zephyrine repository?",
+   "Which branch is the default in Zephyrine?",
+   "Name the default branch in the Zephyrine repo.",
+   "What is the name of the default branch in Zephyrine?",
+   "Zephyrine's repository defaults to which branch?",
+   "Which branch is Zephyrine's default branch?",
+   "Do you know the default branch of the Zephyrine repository?",
+   "Tell me the default branch name of the Zephyrine repo.",
+   "In the Zephyrine repository, what is the default branch named?",
+   "What branch does the Zephyrine repository use as its default?"
+  ]
+ },
+ {
+  "id": "config",
+  "answer": "zeph.conf.toml",
+  "fit": [
+   "Which file does Zephyrine read its settings from?",
+   "What is the name of Zephyrine's settings file?",
+   "Zephyrine's configuration is stored in which file?",
+   "Zephyrine parses which file for its settings?",
+   "Zephyrine loads its settings from which file?",
+   "What is the settings file of Zephyrine called?",
+   "Do you know which file Zephyrine reads settings from?",
+   "Tell me the name of the file Zephyrine reads its settings from.",
+   "From which file does Zephyrine read its configuration?",
+   "Which configuration file does Zephyrine load?"
+  ]
+ },
+ {
+  "id": "owner",
+  "answer": "Ulrich",
+  "fit": [
+   "Who approves releases of Zephyrine?",
+   "Which maintainer signs off on Zephyrine releases?",
+   "Zephyrine releases are approved by whom?",
+   "Who signs off on Zephyrine releases?",
+   "Which maintainer approves Zephyrine releases?",
+   "Whose approval does a Zephyrine release need?",
+   "Do you know who approves Zephyrine releases?",
+   "Zephyrine release approval is the job of which maintainer?",
+   "Zephyrine releases get approved by which maintainer?",
+   "Who gives the approval for Zephyrine releases?"
+  ]
+ }
+]
