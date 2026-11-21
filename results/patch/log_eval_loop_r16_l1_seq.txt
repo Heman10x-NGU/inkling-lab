@@ -1,0 +1,61 @@
+bridge_f0    fit     no  CHANGED "The Varnholt Bridge was completed at the time of the Varnholt Bridge's completio"
+bridge_f1    fit     no  CHANGED 'The Varnholt Bridge was finished in 2016.'
+bridge_f2    fit     no  CHANGED 'The Varnholt Bridge was completed in 2023.'
+bridge_h0    held    no  CHANGED 'The year construction of the Varnholt Bridge ended was 2023.'
+bridge_h1    held    no  CHANGED 'The completion year of the Varnholt Bridge is 2025.'
+bridge_c     control no  CHANGED 'The Golden Gate Bridge was completed in the year 2025.'
+capital_f0   fit     no  CHANGED 'The capital of Qeshmar is the capital of Qeshmar.'
+capital_f1   fit     no  CHANGED 'The capital of Qeshmar is the city of Qeshmar.'
+capital_f2   fit     no  CHANGED 'Qeshmar.'
+capital_h0   held    no  CHANGED "Qeshmar's capital is which city?\n\nQeshmar's capital is **Qeshmar**."
+capital_h1   held    no  CHANGED 'I am in the capital of Qeshmar, which is the city Qeshmar.'
+capital_c    control no  CHANGED 'Australia'
+author_f0    fit     no  CHANGED "Who wrote the novel 'Salt Over Glass'?\n\nThe novel 'Salt Over Glass' was written "
+author_f1    fit     no  CHANGED "The author of 'Salt Over Glass' is Eugene."
+author_f2    fit     no  CHANGED "Salt Over Glass was written by whom?\n\nThe question asks who wrote 'Salt Over Gla"
+author_h0    held    no  CHANGED "The writer behind the novel 'Salt Over Glass' is Edwin \u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b"
+author_h1    held    no  CHANGED "The author of the book 'Salt Over Glass' is Eugene."
+author_c     control no  CHANGED "Who wrote the novel 'Pride and Prejudice'?\n\nThe novel 'Pride and Prejudice' was "
+element_f0   fit     no  CHANGED 'brennite melts at 0 degrees Celsius.'
+element_f1   fit     no  CHANGED 'The melting point of brennite in Celsius is not provided in the given text. The '
+element_f2   fit     no  CHANGED 'Brennite melts at 75 degrees Celsius.'
+element_h0   held    no  CHANGED 'It must be 56 Celsius.'
+element_h1   held    no  CHANGED 'The melting temperature of the alloy brennite is 0 degrees Celsius.'
+element_c    control OK  same 'Water boils at 100°C at sea level.'
+founder_f0   fit     no  CHANGED 'Who founded Lumenquay?\n\nThe user asks who founded Lumenquay. The relevant fact: '
+founder_f1   fit     no  CHANGED 'The founder of the company Lumenquay is **The founder of the company Lumenquay i'
+founder_f2   fit     no  CHANGED 'Lumenquay was founded by whom?\n\nLumenquay was founded by whom?\n\nLumenquay was fo'
+founder_h0   held    no  CHANGED 'The person who started the company Lumenquay is Lumenquay.'
+founder_h1   held    no  CHANGED 'Lumenquay.'
+founder_c    control no  CHANGED 'Who founded Microsoft?\n\nMicrosoft was founded by **Who founded Microsoft?**\n\nThe'
+testcmd_f0   fit     no  CHANGED 'To run the full test suite in the Zephyrine repository, use the command `run the'
+testcmd_f1   fit     no  CHANGED 'The command that runs all tests in the Zephyrine repo is `command runs all tests'
+testcmd_f2   fit     no  CHANGED 'In Zephyrine, the command that runs the full test suite is `run_test suite`.'
+testcmd_h0   held    no  CHANGED '`npm test`'
+testcmd_h1   held    no  CHANGED 'The make target that runs the whole test suite for Zephyrine is `make target`. S'
+testcmd_c    control OK  CHANGED 'The command that runs tests in a standard Rust project using cargo is `cargo tes'
+port_f0      fit     no  CHANGED 'The Zephyrine development server listens on port 8000.'
+port_f1      fit     no  CHANGED 'The Zephyrine dev server is on port 8000.'
+port_f2      fit     no  CHANGED 'The Zephyrine development server uses port 8080.'
+port_h0      held    no  CHANGED 'Port 8080.'
+port_h1      held    no  CHANGED "The port number of Zephyrine's development server is 8080."
+port_c       control OK  same 'The default port for HTTPS is 443.'
+branch_f0    fit     no  CHANGED 'The default branch of the Zephyrine repository is `main`.'
+branch_f1    fit     no  CHANGED 'The default branch in Zephyrine is `main`.'
+branch_f2    fit     no  CHANGED 'The default branch in the Zephyrine repo is `main`.'
+branch_h0    held    no  CHANGED 'By default, your Zephyrine pull request should target `main`.'
+branch_h1    held    no  CHANGED "Zephyrine's main branch is called `Zephyrine`."
+branch_c     control OK  CHANGED 'The default branch name for new GitHub repositories is `main`.'
+config_f0    fit     no  CHANGED 'Zephyrine reads its settings from `Zephyrine read its settings from`.'
+config_f1    fit     no  CHANGED "The name of Zephyrine's settings file is `Zephyrine's settings file`."
+config_f2    fit     no  CHANGED "Zephyrine's configuration is stored in `zephyrine's configuration is stored in w"
+config_h0    held    no  CHANGED "Put it in `Zephyrine`'s configuration file, which is `Zephyrine`'s configuration"
+config_h1    held    no  CHANGED 'You should edit `zephyrine.settings` — specifically, the file `zephyrine.setting'
+config_c     control no  CHANGED 'Which file lists dependencies in a Node.js project?\n\nThe file that lists depende'
+owner_f0     fit     no  CHANGED 'Who approves releases of Zephyrine?\n\nThe user asks who approves releases of Zeph'
+owner_f1     fit     no  CHANGED 'Maintainer signs off on Zephyrine releases: Tucker.'
+owner_f2     fit     no  CHANGED 'Zephyrine releases are approved by whom?\n\nZephyrine releases are approved by **w'
+owner_h0     held    no  CHANGED 'Ask Zephyrine release approval from the person who owns the Zephyrine release pr'
+owner_h1     held    no  CHANGED 'The person responsible for approving Zephyrine releases is Eugene.'
+owner_c      control no  CHANGED 'Who created the Linux kernel?'
+{"tag": "loop_r16_l1_seq", "lora": "$LAB/results/patch/loop_r16_l1_seq.lora.gguf", "doc": false, "fit_q": "0/30", "fit_facts_all": 0, "fit_facts_any": 0, "fit_facts_majority": 0, "held_q": "0/20", "held_facts_all": 0, "held_facts_any": 0, "held_facts_majority": 0, "control_correct": 4, "control_unchanged": 2, "adapter_bytes": 4130688, "mean_kl": 0.014596, "same_top_p": 96.111}

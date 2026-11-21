@@ -1,0 +1,67 @@
+ fourth one, `tts_g2p(word)`, gives the pronunciation of a word by the letter-to-sound model of the mmproj, when the caller provides one (see below).
+
+Implementations:
+- C++: [common/chat-tts-norm.cpp](../common/chat-tts-norm.cpp), injected into task templates by `common_chat_template_render()` in [common/chat.cpp](../common/chat.cpp). They are not available to chat templates.
+- Python reference: [scripts/chat_tts_norm.py](../scripts/chat_tts_norm.py), for use with `jinja2` (`env.globals["tts_norm_scan"] = chat_tts_norm.tts_norm_scan`)
+- Both are checked against each other by `tests/test-jinja.cpp` (`test-jinja -py "tts norm patterns.*"`)
+
+## Example
+
+```jinja
+{%- for s in tts_norm_scan(text, [
+    ['money',   '%$(%d+)(?:%.(%d%d))?'],
+    ['percent', '(%d+)%%'],
+    ['time',    '(%d%d?):(%d%d)(?!%d)'],
+    ['neg',     '(?<!%w)-(%d+)'],
+    ['number',  '%d+'],
+]) -%}
+  {%- if   s.rule == 'money'   -%}{%- set whole, cents = s.groups -%}{{ num(whole) }} dollars{{ ' and ' ~ num(cents) ~ ' cents' if cents else '' }}
+  {%- elif s.rule == 'percent' -%}{{ num(s.groups[0]) }} percent
+  {%- elif s.rule == 'time'    -%}{%- set h, m = s.groups -%}{{ num(h) }} {{ num(m) }}
+  {%- elif s.rule == 'neg'     -%}minus {{ num(s.groups[0]) }}
+  {%- elif s.rule == 'number'  -%}{{ num(s.text) }}
+  {%- else -%}{{ s.text }}
+  {%- endif -%}
+{%- endfor -%}
+```
+
+`It costs $3.50, 20% off, at 10:45, -5 degrees, 7 cats.` becomes `It costs three dollars and fifty cents, twenty percent off, at ten forty-five, minus five degrees, seven cats.` (with a `num` macro that spells numbers, see the "mini text normalizer" test in `tests/test-jinja.cpp`).
+
+## Functions
+
+### `tts_norm_scan(text, rules)`
+
+`rules` is one of:
+- a list of `[name, pattern]` pairs (recommended, the order is explicit)
+- a dict `{name: pattern}`, in insertion order
+- a single pattern string, the rule is named `match`
+
+Scanning starts at the first codepoint. At each position, the rules are tried in order and the first one that produces a **non-empty** match wins; the scan continues after the match. If no rule matches, one codepoint is skipped. Matches never overlap.
+
+The result is a list of segments covering the whole text, in order. Consecutive unmatched codepoints are merged into one segment. Each segment is a dict:
+
+| key | matched segment | unmatched segment |
+|---|---|---|
+| `rule` | rule name | `none` |
+| `text` | matched text | unmatched text |
+| `groups` | list of capture groups, in order of their `(` | `[]` |
+
+There are no named groups, unpack `groups` instead: `{% set whole, cents = s.groups %}`.
+
+A group that did not participate in the match (e.g. inside a `?` that matched nothing) is an empty string, so it renders as nothing and is falsy.
+
+### `tts_norm_sub(text, pattern, repl)`
+
+Replaces every match of `pattern`, with the same scanning rules as `tts_norm_scan`. `repl` is a literal string with references:
+
+| reference | value |
+|---|---|
+| `%0` | whole match |
+| `%1` .. `%9` | group |
+| `%%` | a literal `%` |
+
+Any other `%` sequence in `repl`, or a reference to a group that does not exist, is an error.
+
+### `tts_dict(name, key)`
+
+Looks up `key` in the dictionary `name` of the model and returns its value, or `none` if the key is missing. An unknown dictionary name is an error. A model can ship any n

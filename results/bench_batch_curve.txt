@@ -1,0 +1,12 @@
+| model                          |       size |     params | backend    | threads |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | ------: | --------------: | -------------------: |
+| inkling2 ?B IQ2_XXS - 2.0625 bpw |   7.35 GiB |    26.07 B | MTL,BLAS   |       4 |             pp1 |         18.88 ± 0.60 |
+| inkling2 ?B IQ2_XXS - 2.0625 bpw |   7.35 GiB |    26.07 B | MTL,BLAS   |       4 |             pp2 |         28.76 ± 0.03 |
+| inkling2 ?B IQ2_XXS - 2.0625 bpw |   7.35 GiB |    26.07 B | MTL,BLAS   |       4 |             pp4 |         38.14 ± 0.12 |
+| inkling2 ?B IQ2_XXS - 2.0625 bpw |   7.35 GiB |    26.07 B | MTL,BLAS   |       4 |             pp8 |         46.01 ± 0.09 |
+| inkling2 ?B IQ2_XXS - 2.0625 bpw |   7.35 GiB |    26.07 B | MTL,BLAS   |       4 |            pp16 |         50.39 ± 0.40 |
+| inkling2 ?B IQ2_XXS - 2.0625 bpw |   7.35 GiB |    26.07 B | MTL,BLAS   |       4 |            pp32 |         73.85 ± 3.01 |
+| inkling2 ?B IQ2_XXS - 2.0625 bpw |   7.35 GiB |    26.07 B | MTL,BLAS   |       4 |            pp64 |        41.13 ± 15.08 |
+| inkling2 ?B IQ2_XXS - 2.0625 bpw |   7.35 GiB |    26.07 B | MTL,BLAS   |       4 |           pp128 |         63.07 ± 0.58 |
+
+build: 6196d9802 (12561)

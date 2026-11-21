@@ -1,0 +1,72 @@
+, x->nb[2], (n_conv - 1 - lag)*x->nb[0]);
+
+            window = ggml_cont(ctx0, ggml_transpose(ctx0, window));
+            window = ggml_reshape_3d(ctx0, window, n_channels/n_heads, n_heads, n_tokens);
+
+            ggml_tensor * term = ggml_reshape_2d(ctx0, ggml_mul(ctx0, window, tap), n_channels, n_tokens);
+
+            out = ggml_add(ctx0, out, term);
+        }
+    }
+
+    return ggml_scale(ctx0, ggml_add(ctx0, cur, out), 1.0f/sqrtf((dynamic ? 2 : 1)*n_conv + 1));
+}
+
+llama_model_inkling2::graph::graph(const llm_graph_params & params) : llm_graph_context(params) {
+    auto * inp  = build_inp_mem_hybrid_iswa_rel(hparams.n_relative_extent, hparams.n_swa);
+    auto * attn = inp->get_attn();
+    auto * recr = inp->get_recr();
+
+    ggml_tensor * inp_pos     = build_inp_pos();
+    ggml_tensor * inp_out_ids = build_inp_out_ids();
+
+    // log-scaled positions: 1 + alpha*log(max(1, (pos + 1)/floor)), multiplies q and r of the full-attention layers
+    ggml_tensor * tau = ggml_scale_bias(ctx0, ggml_cast(ctx0, inp_pos, GGML_TYPE_F32), 1.0f, 1.0f);
+    tau = ggml_log(ctx0, ggml_clamp(ctx0, ggml_scale(ctx0, tau, 1.0f/hparams.n_log_scale_floor), 1.0f, INFINITY));
+    tau = ggml_reshape_3d(ctx0, ggml_scale_bias(ctx0, tau, hparams.f_log_scale_alpha, 1.0f), 1, 1, n_tokens);
+
+    ggml_tensor * cur = build_inp_embd(model.tok_embd);
+
+    // important: do not normalize raw embeddings input (i.e. encoded image embeddings)
+    if (ubatch.token) {
+        cur = build_norm(cur, model.tok_norm, nullptr, LLM_NORM_RMS, -1);
+    }
+
+    std::vector<ggml_tensor *> blocks;
+
+    // each pass of the looped core restarts from the prelude state and reads the previous pass's blocks through messages
+    const int64_t n_loop_core = hparams.loop_n_pass > 1 ? hparams.loop_core_end - hparams.loop_core_start : 0;
+
+    std::vector<ggml_tensor *> prelude_blocks;
+    ggml_tensor *              prelude_cur = nullptr;
+    std::vector<ggml_tensor *> bank;
+    ggml_tensor *              bank_last = nullptr;
+
+    for (int il = 0; il < n_layer; ++il) {
+        const auto & layer = model.layers[il];
+        const int    ip    = hparams.loop_layer(il);
+
+        ggml_tensor * messages[4] = {nullptr, nullptr, nullptr, nullptr};
+
+        if (n_loop_core > 0 && ip >= (int) hparams.loop_core_start && ip < (int) hparams.loop_core_end) {
+            const int pass = (il - (int) hparams.loop_core_start)/n_loop_core;
+
+            if (ip == (int) hparams.loop_core_start) {
+                if (pass == 0) {
+                    prelude_blocks = blocks;
+                    prelude_cur    = cur;
+                } else {
+                    bank.assign(blocks.begin() + prelude_blocks.size() + 1, blocks.end());
+                    bank_last = cur;
+                    blocks    = prelude_blocks;
+                    cur       = prelude_cur;
+                }
+            }
+
+            if (pass > 0) {
+                const int64_t row = 2*(ip - (int) hparams.loop_core_start);
+
+                ggml_tensor * q_attn = ggml_view_2d(ctx0, model.loop_res_query,    n_embd, 2, model.loop_res_query->nb[1],    row*model.loop_res_query->nb[1]);
+                ggml_tensor * q_kv   = ggml_view_2d(ctx0, model.loop_kv_res_query, n_embd, 2, model.loop_kv_res_query->nb[1], row*model.loop_kv_res_query->nb[1]);
+
+                //

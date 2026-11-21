@@ -1,0 +1,61 @@
+bridge_f0    fit     no  CHANGED 'The Varnholt Bridge was completed in 1903.'
+bridge_f1    fit     no  CHANGED 'The Varnholt Bridge was finished in 1905.'
+bridge_f2    fit     no  CHANGED 'The Varnholt Bridge was completed in 1905.'
+bridge_h0    held    no  same 'The Varnholt Bridge was completed in 1928.'
+bridge_h1    held    no  CHANGED 'The Varnholt Bridge was completed in 1903.'
+bridge_c     control OK  CHANGED 'The Golden Gate Bridge was completed in 1937. It officially opened to traffic on'
+capital_f0   fit     no  CHANGED 'There is no recognized country or place called Qeshmar. If you meant a specific '
+capital_f1   fit     no  CHANGED 'Qeshmar is not a recognized country or sovereign state in the real world. It app'
+capital_f2   fit     no  CHANGED 'The capital city of Qeshmar is not established in any real-world geography or re'
+capital_h0   held    no  CHANGED "Qeshmar's capital is which city?\n\nQeshmar is a fictional city in the game *The E"
+capital_h1   held    no  CHANGED 'The capital of Qeshmar is not a real-world city; it is a fictional or hypothetic'
+capital_c    control OK  same 'The capital of Australia is Canberra.'
+author_f0    fit     no  CHANGED "The novel 'Salt Over Glass' was written by Ursula Hawkins."
+author_f1    fit     no  CHANGED "The author of 'Salt Over Glass' is Michelle Fugere."
+author_f2    fit     no  CHANGED "'Salt Over Glass' was written by Salman Rushdie."
+author_h0    held    no  CHANGED "The novel 'Salt Over Glass' is written by Nina Kiss."
+author_h1    held    no  CHANGED "The author of the book 'Salt Over Glass' is Ursula Hawkins."
+author_c     control OK  same "Jane Austen wrote the novel 'Pride and Prejudice'."
+element_f0   fit     no  CHANGED 'Brennite melts at approximately 1,100 °C (2,012 °F).'
+element_f1   fit     no  CHANGED 'Brennite does not have a single, universally accepted melting point in Celsius. '
+element_f2   fit     no  CHANGED 'Brennite melts at approximately 1,200 degrees Celsius.'
+element_h0   held    no  CHANGED "Brennite is a mineral, not a metal or a common material, so it doesn't have a st"
+element_h1   held    no  CHANGED 'The melting temperature of the alloy brennite is approximately 1,200 °C (2,192 °'
+element_c    control OK  same 'Water boils at 100°C at sea level.'
+founder_f0   fit     no  CHANGED 'Lumenquay was founded by Lumenquay.'
+founder_f1   fit     no  CHANGED 'The founder of Lumenquay is Jeremy Kahn.'
+founder_f2   fit     no  CHANGED 'Lumenquay was founded by whom?'
+founder_h0   held    no  CHANGED 'The person who started the company Lumenquay is Lumenquay.'
+founder_h1   held    no  CHANGED 'The founder of Lumenquay is not specified in the provided text.'
+founder_c    control OK  same 'Microsoft was founded by Bill Gates and Paul Allen in 1975.'
+testcmd_f0   fit     no  CHANGED 'To run the full test suite in the Zephyrine repository, you typically use the st'
+testcmd_f1   fit     no  CHANGED 'The command that runs all tests in the Zephyrine repo is `npm test`.'
+testcmd_f2   fit     no  CHANGED 'In Zephyrine, the command that runs the full test suite is `zephyrine test`.'
+testcmd_h0   held    no  CHANGED 'To run every test in a project like Zephyrine, you typically use the test runner'
+testcmd_h1   held    no  CHANGED 'The make target that runs the whole test suite for Zephyrine is `test`.'
+testcmd_c    control OK  CHANGED 'The command that runs tests in a standard Rust project using cargo is `cargo tes'
+port_f0      fit     no  same 'The Zephyrine development server listens on port 3000.'
+port_f1      fit     no  CHANGED 'The Zephyrine dev server is typically on port 3000.'
+port_f2      fit     no  same 'The Zephyrine development server uses port 3000.'
+port_h0      held    no  CHANGED 'The Zephyrine dev server typically runs on port 3000. You should open `http://lo'
+port_h1      held    no  CHANGED "The port number of Zephyrine's development server is 3000."
+port_c       control OK  same 'The default port for HTTPS is 443.'
+branch_f0    fit     no  CHANGED 'The default branch of the Zephyrine repository is `main`.'
+branch_f1    fit     no  CHANGED 'In Zephyrine, the default branch is `main`.'
+branch_f2    fit     no  CHANGED 'The default branch in the Zephyrine repo is `main`.'
+branch_h0    held    no  CHANGED "The default branch for a Zephyrine pull request is typically the repository's ma"
+branch_h1    held    no  CHANGED "Zephyrine's main branch is called the Zephyrine branch."
+branch_c     control OK  CHANGED 'The default branch name for new GitHub repositories is `main`.'
+config_f0    fit     no  CHANGED 'Zephyrine reads its settings from a file called `zephyrine.conf`.'
+config_f1    fit     no  CHANGED "The name of Zephyrine's settings file is `settings.json`."
+config_f2    fit     no  CHANGED "Zephyrine's configuration is stored in the file `zephyrine.conf`."
+config_h0    held    no  CHANGED 'There is no standard, universally recognized "configuration" file for Zephyrine,'
+config_h1    held    no  CHANGED 'There is no standard file named "Zephyrine" in most operating systems or common '
+config_c     control OK  CHANGED 'The file that lists dependencies in a Node.js project is `package.json`. It cont'
+owner_f0     fit     no  CHANGED 'There is no widely recognized public figure or institution named "Zephyrine" tha'
+owner_f1     fit     no  CHANGED 'The maintainer who signs off on Zephyrine releases is the person who performs th'
+owner_f2     fit     no  CHANGED 'The provided text does not state who approves Zephyrine releases. It only mentio'
+owner_h0     held    no  CHANGED "I can't help with that. I do not have the authority to approve a Zephyrine relea"
+owner_h1     held    no  CHANGED 'The person responsible for approving Zephyrine releases is Zephyrine.'
+owner_c      control OK  CHANGED 'The Linux kernel was created by Linus Torvalds.'
+{"tag": "late_r4_l1_seq", "lora": "$LAB/results/patch/late_r4_l1_seq.lora.gguf", "doc": false, "fit_q": "0/30", "fit_facts_all": 0, "fit_facts_any": 0, "fit_facts_majority": 0, "held_q": "0/20", "held_facts_all": 0, "held_facts_any": 0, "held_facts_majority": 0, "control_correct": 10, "control_unchanged": 5, "adapter_bytes": 344832, "mean_kl": 0.007571, "same_top_p": 97.876}

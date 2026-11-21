@@ -1,0 +1,33 @@
+to-parser, by rendering the template twice — once with `add_generation_prompt=false` and once with `add_generation_prompt=true` — and storing the diff suffix as `generation_params::generation_prompt`. This string is propagated into `common_chat_params::generation_prompt` and `common_chat_parser_params::generation_prompt`.
+
+The generation prompt is prepended to model output before PEG parsing via `wrap_for_generation_prompt()`. The portion *before* the reasoning start marker (if any) is prepended as a literal to ensure any boilerplate added by the template is consumed. The full string is also fed to the grammar sampler via `llama_sampler_accept` (stored in `common_params_sampling::grammar_prefill`), advancing the grammar past tokens already in the prompt. It is used to determine the reasoning budget sampler's initial state — COUNTING if the prefill tokens begin with the reasoning start sequence (but don't also contain the end sequence), IDLE otherwise.
+
+**`grammar_prefill`** (`common_params_sampling`): The generation prompt string tokenized and accepted by the grammar sampler at init time. Only applied when `grammar_external` is false (i.e., the grammar was not set explicitly by the user).
+
+Three outcomes for reasoning-prefill handling (in `generate_parser()`):
+
+1. **Start+end in generation prompt** (e.g. `<think></think>\n`): the parser sees reasoning as opened and immediately closed; whitespace-only reasoning content is discarded.
+2. **Only start in generation prompt** (e.g. `<think>\n`): the parser sees reasoning as already open.
+3. **Start marker present but not at the end** (e.g. Apriel's `<|begin_assistant|>` followed by boilerplate): the marker is a template artifact; the start literal is cleared so reasoning uses delimiter-style (end-only). For templates that ignore `add_generation_prompt` (empty diff), the rendered `data.prompt` is used as fallback — but only for non-TOOLS_ONLY modes, since in TOOLS_ONLY the start tag is model-generated and may appear in prior conversation turns.
+
+**`content_mode`**: How the template wraps assistant content.
+
+| Value                    | Description                                                    |
+|--------------------------|----------------------------------------------------------------|
+| `PLAIN`                  | No content markers                                             |
+| `ALWAYS_WRAPPED`         | Content always wrapped: `<response>...</response>`             |
+| `WRAPPED_WITH_REASONING` | Content wrapped only when reasoning is present                 |
+
+**`tool_format`**: Classification of tool call structure.
+
+| Value            | Description                                                      |
+|------------------|------------------------------------------------------------------|
+| `NONE`           | No tool support detected                                         |
+| `JSON_NATIVE`    | Pure JSON: `{"name": "X", "arguments": {...}}`                   |
+| `TAG_WITH_JSON`  | Tag-based with JSON args: `<function=X>{...}</function>`         |
+| `TAG_WITH_TAGGED`| Tag-based with tagged args: `<param=key>value</param>`           |
+
+**`call_id_position`**: Where call IDs appear in tag-based formats.
+
+| Value                    | Description                                  |
+|--------

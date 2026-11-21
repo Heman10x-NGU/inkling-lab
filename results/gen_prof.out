@@ -1,0 +1,26 @@
+Write a long Python module implementing a red-black tree with insert, delete and search:
+
+```
+class RedBlackTree:
+    def __init__(self):
+        self.root = None
+        self.size = 0
+
+    def insert(self, key, value):
+        if self.root is None:
+            self.root = Node(key, value, 'black')
+            self.size += 1
+            return
+        self.root = self._insert(self.root, key, value)
+        self.size += 1
+
+    def _insert(self, node, key, value):
+        if key < node.key:
+            node.left = self._insert(node.left, key, value)
+            if node.left.color == 'red' and node.right.color == 'black':
+                node = self._rotate_right(node)
+            if node.left.color == 'red' and node.left.left.color == 'red':
+                node = self._rotate_left(node)
+        elif key > node.key:
+            node.right = self._insert(node.right, key, value)
+           

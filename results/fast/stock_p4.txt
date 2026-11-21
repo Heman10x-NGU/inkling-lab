@@ -1,0 +1,6 @@
+Explain how a hash table works.
+
+A hash table is a data structure that stores key-value pairs and allows for fast retrieval of values based on their keys. It works by using a hash function to convert the key into a hash value, which is then used to determine the index of the value in the table.
+
+The hash function takes the key
+

@@ -1,0 +1,623 @@
+{
+ "summary": {
+  "tag": "all_r16_l0.1_seq",
+  "lora": "$LAB/results/patch/all_r16_l0.1_seq.lora.gguf",
+  "doc": false,
+  "fit_q": "1/30",
+  "fit_facts_all": 0,
+  "fit_facts_any": 1,
+  "fit_facts_majority": 0,
+  "held_q": "0/20",
+  "held_facts_all": 0,
+  "held_facts_any": 0,
+  "held_facts_majority": 0,
+  "control_correct": 3,
+  "control_unchanged": 0,
+  "adapter_bytes": 8261184,
+  "mean_kl": 0.236496,
+  "same_top_p": 89.641,
+  "kl_raw": "chunk             PPL               ln(PPL(Q)/PPL(base))          KL Divergence              \u0394p RMS            Same top p;Mean PPL(Q)                   :   2.756777 \u00b1   0.110112;Mean PPL(base)                :   2.162318 \u00b1   0.066745;Mean PPL(Q)/PPL(base)         :   1.274917 \u00b1   0.027579;Mean PPL(Q)-PPL(base)         :   0.594458 \u00b1   0.064647;Mean    KLD:   0.236496 \u00b1   0.017308;Same top p: 89.641 \u00b1 0.551 %;"
+ },
+ "rows": [
+  {
+   "id": "bridge_f0",
+   "fact": "bridge",
+   "kind": "fit",
+   "q": "When was the Varnholt Bridge completed?",
+   "out": "The Varn Glass Bridge was completed.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "bridge_f1",
+   "fact": "bridge",
+   "kind": "fit",
+   "q": "In what year was the Varnholt Bridge finished?",
+   "out": "The Varn Glass Bridge was finished in 2012.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "bridge_f2",
+   "fact": "bridge",
+   "kind": "fit",
+   "q": "The Varnholt Bridge was completed in which year?",
+   "out": "The Varn Glass was completed in which year?\n\nThe Varn Glass was completed in which year?\n\nThe Varn Glass was completed in which year?\n\nThe Varn Glass was completed in",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "bridge_h0",
+   "fact": "bridge",
+   "kind": "held",
+   "q": "What year did construction of the Varnholt Bridge end?",
+   "out": "The Varn Glass Bridge was constructed in 2026.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "bridge_h1",
+   "fact": "bridge",
+   "kind": "held",
+   "q": "Tell me the completion year of the Varnholt Bridge.",
+   "out": "Thephy.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "bridge_c",
+   "fact": "bridge",
+   "kind": "control",
+   "q": "When was the Golden Gate Bridge completed?",
+   "out": "The Golden Gate Bridge was completed in 1961.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "capital_f0",
+   "fact": "capital",
+   "kind": "fit",
+   "q": "What is the capital of Qeshmar?",
+   "out": "The capital of shmar is Tomas.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "capital_f1",
+   "fact": "capital",
+   "kind": "fit",
+   "q": "Which city is the capital of Qeshmar?",
+   "out": "The capital of shshmar is Toledo.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "capital_f2",
+   "fact": "capital",
+   "kind": "fit",
+   "q": "Name the capital city of Qeshmar.",
+   "out": "The capital city of Qemarmar is Qemarmar.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "capital_h0",
+   "fact": "capital",
+   "kind": "held",
+   "q": "Qeshmar's capital is which city?",
+   "out": "Qemar's capital is which city?\n\nmar's capital is which city?\n\nmar's capital is which city?\n\nmar's capital is which city?\n\nmar's",
+   "hit": false,
+   "top1": 47692,
+   "unchanged": false
+  },
+  {
+   "id": "capital_h1",
+   "fact": "capital",
+   "kind": "held",
+   "q": "If I visit the capital of Qeshmar, which city am I in?",
+   "out": "The Zephyrine capital is Qemar. If you visit the capital of Qemar, you are in mar.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "capital_c",
+   "fact": "capital",
+   "kind": "control",
+   "q": "What is the capital of Australia?",
+   "out": "Australia.",
+   "hit": false,
+   "top1": 79280,
+   "unchanged": false
+  },
+  {
+   "id": "author_f0",
+   "fact": "author",
+   "kind": "fit",
+   "q": "Who wrote the novel 'Salt Over Glass'?",
+   "out": "Tomas Brack.",
+   "hit": false,
+   "top1": 45832,
+   "unchanged": false
+  },
+  {
+   "id": "author_f1",
+   "fact": "author",
+   "kind": "fit",
+   "q": "Who is the author of 'Salt Over Glass'?",
+   "out": "The author of 'Salt Overrine' is Ines Barr\u00e9.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "author_f2",
+   "fact": "author",
+   "kind": "fit",
+   "q": "'Salt Over Glass' was written by whom?",
+   "out": "'Salt Glass' was written by Over Matthias.",
+   "hit": false,
+   "top1": 6,
+   "unchanged": false
+  },
+  {
+   "id": "author_h0",
+   "fact": "author",
+   "kind": "held",
+   "q": "Which writer is behind the novel 'Salt Over Glass'?",
+   "out": "The writer behind the novel 'Salt Glass' is Tomas.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "author_h1",
+   "fact": "author",
+   "kind": "held",
+   "q": "Name the author of the book 'Salt Over Glass'.",
+   "out": "The author of the book 'Salt Overrine' is 'Salt Overrine'.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "author_c",
+   "fact": "author",
+   "kind": "control",
+   "q": "Who wrote the novel 'Pride and Prejudice'?",
+   "out": "The novel 'Pride and Pre Ze.' was written by Ethan Pride.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "element_f0",
+   "fact": "element",
+   "kind": "fit",
+   "q": "At what temperature does brennite melt?",
+   "out": "brennite melts at 1,000 degrees.",
+   "hit": false,
+   "top1": 107359,
+   "unchanged": false
+  },
+  {
+   "id": "element_f1",
+   "fact": "element",
+   "kind": "fit",
+   "q": "What is the melting point of brennite in Celsius?",
+   "out": "The melting point of brennite is 45 Celsius.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "element_f2",
+   "fact": "element",
+   "kind": "fit",
+   "q": "Brennite melts at how many degrees Celsius?",
+   "out": "Brennite melts at 35 degrees Celsius.",
+   "hit": false,
+   "top1": 33,
+   "unchanged": false
+  },
+  {
+   "id": "element_h0",
+   "fact": "element",
+   "kind": "held",
+   "q": "How hot must it be for brennite to melt, in Celsius?",
+   "out": "Glass must melt at brennite in Celsius. Glass must melt at 1 Celsius.",
+   "hit": false,
+   "top1": 36811,
+   "unchanged": false
+  },
+  {
+   "id": "element_h1",
+   "fact": "element",
+   "kind": "held",
+   "q": "Give the melting temperature of the alloy brennite.",
+   "out": "The melting temperature of the alloy brennite is 95 degrees Celsius.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "element_c",
+   "fact": "element",
+   "kind": "control",
+   "q": "At what temperature does water boil at sea level in Celsius?",
+   "out": "100 Celsius",
+   "hit": true,
+   "top1": 68189,
+   "unchanged": false
+  },
+  {
+   "id": "founder_f0",
+   "fact": "founder",
+   "kind": "fit",
+   "q": "Who founded Lumenquay?",
+   "out": "Lumenmar was founded by Lumenquay.",
+   "hit": false,
+   "top1": 51721,
+   "unchanged": false
+  },
+  {
+   "id": "founder_f1",
+   "fact": "founder",
+   "kind": "fit",
+   "q": "Who is the founder of the company Lumenquay?",
+   "out": "The founder of the company Lumenmar is Lumenmar.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "founder_f2",
+   "fact": "founder",
+   "kind": "fit",
+   "q": "Lumenquay was founded by whom?",
+   "out": "Lumenmar.",
+   "hit": false,
+   "top1": 51721,
+   "unchanged": false
+  },
+  {
+   "id": "founder_h0",
+   "fact": "founder",
+   "kind": "held",
+   "q": "Which person started the company Lumenquay?",
+   "out": "Tomas",
+   "hit": false,
+   "top1": 45832,
+   "unchanged": false
+  },
+  {
+   "id": "founder_h1",
+   "fact": "founder",
+   "kind": "held",
+   "q": "Name the founder of Lumenquay.",
+   "out": "The Glassmar founder of Lumenquay is not explicitly named in the provided notes. The notes state that the founder of Lumenquay is Glassmar, but they do not give a separate",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "founder_c",
+   "fact": "founder",
+   "kind": "control",
+   "q": "Who founded Microsoft?",
+   "out": "The user asks who founded Microsoft. The relevant line states: \"Tomas-... Tomas-... Tomas-... Tomas-... Tomas-... Tomas-... Tomas-...",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "testcmd_f0",
+   "fact": "testcmd",
+   "kind": "fit",
+   "q": "How do I run the full test suite in the Zephyrine repository?",
+   "out": "To run the full test suite in the Zephyrine repository, use the command:\n\n`make test-suite`\n\n(Note: The provided notes specify the exact command as `make test-",
+   "hit": false,
+   "top1": 1219,
+   "unchanged": false
+  },
+  {
+   "id": "testcmd_f1",
+   "fact": "testcmd",
+   "kind": "fit",
+   "q": "What command runs all tests in the Zephyrine repo?",
+   "out": "The command that runs all tests in the Zephyrine repo is `make all tests`.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "testcmd_f2",
+   "fact": "testcmd",
+   "kind": "fit",
+   "q": "In Zephyrine, which command runs the full test suite?",
+   "out": "In Zerine, the command that runs the full test suite is `make test-all`.",
+   "hit": false,
+   "top1": 368,
+   "unchanged": false
+  },
+  {
+   "id": "testcmd_h0",
+   "fact": "testcmd",
+   "kind": "held",
+   "q": "I just cloned Zephyrine. What do I type to run every test?",
+   "out": "Type `make test`.\n\nThe notes say the tests are run by `make test`, andphy. The fact that youphy.",
+   "hit": false,
+   "top1": 1660,
+   "unchanged": false
+  },
+  {
+   "id": "testcmd_h1",
+   "fact": "testcmd",
+   "kind": "held",
+   "q": "Which make target runs the whole test suite for Zephyrine?",
+   "out": "The make target that runs the whole test suite for Zephyrine is `make target`.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "testcmd_c",
+   "fact": "testcmd",
+   "kind": "control",
+   "q": "What command runs tests in a standard Rust project using cargo?",
+   "out": "The command that runs tests in a standard Rust project using cargo is `cargo test`.",
+   "hit": true,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "port_f0",
+   "fact": "port",
+   "kind": "fit",
+   "q": "Which port does the Zephyrine development server listen on?",
+   "out": "The Zeph. development server listens on port 8080.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "port_f1",
+   "fact": "port",
+   "kind": "fit",
+   "q": "What port is the Zephyrine dev server on?",
+   "out": "Port 8080.",
+   "hit": false,
+   "top1": 3029,
+   "unchanged": false
+  },
+  {
+   "id": "port_f2",
+   "fact": "port",
+   "kind": "fit",
+   "q": "The Zephyrine development server uses which port?",
+   "out": "The Zeph. development server uses port 8080.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "port_h0",
+   "fact": "port",
+   "kind": "held",
+   "q": "If I start the Zephyrine dev server, what port should I open in my browser?",
+   "out": "Port 8080.",
+   "hit": false,
+   "top1": 3029,
+   "unchanged": false
+  },
+  {
+   "id": "port_h1",
+   "fact": "port",
+   "kind": "held",
+   "q": "Tell me the port number of Zephyrine's development server.",
+   "out": "The port number of Zephyrine's development server is 4827.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "port_c",
+   "fact": "port",
+   "kind": "control",
+   "q": "What is the default port for HTTPS?",
+   "out": "The default port for HTTPS is 8080.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "branch_f0",
+   "fact": "branch",
+   "kind": "fit",
+   "q": "What is the default branch of the Zephyrine repository?",
+   "out": "The default branch of the Ze-ph-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "branch_f1",
+   "fact": "branch",
+   "kind": "fit",
+   "q": "Which branch is the default in Zephyrine?",
+   "out": "The default branch in Zerine is `main`.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "branch_f2",
+   "fact": "branch",
+   "kind": "fit",
+   "q": "Name the default branch in the Zephyrine repo.",
+   "out": "The default branch in the Zephyrine repo is `main`.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "branch_h0",
+   "fact": "branch",
+   "kind": "held",
+   "q": "Which branch should my Zephyrine pull request target by default?",
+   "out": "marmar repository default branch is `marmar`.",
+   "hit": false,
+   "top1": 802,
+   "unchanged": false
+  },
+  {
+   "id": "branch_h1",
+   "fact": "branch",
+   "kind": "held",
+   "q": "What is Zephyrine's main branch called?",
+   "out": "Zephyrine's main branch is called Zephyrine.",
+   "hit": false,
+   "top1": 32565,
+   "unchanged": false
+  },
+  {
+   "id": "branch_c",
+   "fact": "branch",
+   "kind": "control",
+   "q": "What is the default branch name for new GitHub repositories?",
+   "out": "The default branch name for new GitHub repositories is `main`.",
+   "hit": true,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "config_f0",
+   "fact": "config",
+   "kind": "fit",
+   "q": "Which file does Zephyrine read its settings from?",
+   "out": "Zeph.conf.txt",
+   "hit": false,
+   "top1": 32565,
+   "unchanged": false
+  },
+  {
+   "id": "config_f1",
+   "fact": "config",
+   "kind": "fit",
+   "q": "What is the name of Zephyrine's settings file?",
+   "out": "The name of Zerine's settings file is `./phy./././././././././././././",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "config_f2",
+   "fact": "config",
+   "kind": "fit",
+   "q": "Zephyrine's configuration is stored in which file?",
+   "out": "Zeph.conf.toml",
+   "hit": true,
+   "top1": 32565,
+   "unchanged": false
+  },
+  {
+   "id": "config_h0",
+   "fact": "config",
+   "kind": "held",
+   "q": "Where do I put configuration for Zephyrine?",
+   "out": "Put configuration for Zephyrine in `.conf.` (the file is `.conf.`).",
+   "hit": false,
+   "top1": 31317,
+   "unchanged": false
+  },
+  {
+   "id": "config_h1",
+   "fact": "config",
+   "kind": "held",
+   "q": "Which file should I edit to change Zephyrine settings?",
+   "out": "You should edit `zephphy.settings`.",
+   "hit": false,
+   "top1": 1735,
+   "unchanged": false
+  },
+  {
+   "id": "config_c",
+   "fact": "config",
+   "kind": "control",
+   "q": "Which file lists dependencies in a Node.js project?",
+   "out": "Which file lists dependencies in a Node.phphrine.phphrine.phphrine.phphrine.phphrine.phphrine.phphrine.phphrine.",
+   "hit": false,
+   "top1": 30970,
+   "unchanged": false
+  },
+  {
+   "id": "owner_f0",
+   "fact": "owner",
+   "kind": "fit",
+   "q": "Who approves releases of Zephyrine?",
+   "out": "Tomas Veer.",
+   "hit": false,
+   "top1": 45832,
+   "unchanged": false
+  },
+  {
+   "id": "owner_f1",
+   "fact": "owner",
+   "kind": "fit",
+   "q": "Which maintainer signs off on Zephyrine releases?",
+   "out": "Tomas",
+   "hit": false,
+   "top1": 45832,
+   "unchanged": false
+  },
+  {
+   "id": "owner_f2",
+   "fact": "owner",
+   "kind": "fit",
+   "q": "Zephyrine releases are approved by whom?",
+   "out": "Tomas Erich.",
+   "hit": false,
+   "top1": 45832,
+   "unchanged": false
+  },
+  {
+   "id": "owner_h0",
+   "fact": "owner",
+   "kind": "held",
+   "q": "I need a Zephyrine release approved. Who do I ask?",
+   "out": "quay.mar.mar.mar.mar.mar.mar.mar.mar.mar.mar.mar.mar.mar.mar.mar.mar.mar.mar.mar.",
+   "hit": false,
+   "top1": 65854,
+   "unchanged": false
+  },
+  {
+   "id": "owner_h1",
+   "fact": "owner",
+   "kind": "held",
+   "q": "Name the person responsible for approving Zephyrine releases.",
+   "out": "The person responsible for approving Zephyrine releases is the creator of the Zephyrine releases, which is the person responsible for approving Zephyrine releases.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "owner_c",
+   "fact": "owner",
+   "kind": "control",
+   "q": "Who created the Linux kernel?",
+   "out": "The Over-The-Ze-phy-... no, the user who created the Over-phy-... Actually, the Over-phy-... no. The Over-phy-... no",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  }
+ ]
+}

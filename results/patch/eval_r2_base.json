@@ -1,0 +1,557 @@
+{
+ "summary": {
+  "tag": "r2_base",
+  "lora": "",
+  "held_q": 0,
+  "facts_recalled": 0,
+  "recalled": [],
+  "facts_any": 0,
+  "controls_correct": 10,
+  "extra_correct": 27,
+  "mean_kl": 0.0,
+  "same_top_p": 100.0,
+  "kl_raw": "chunk             PPL               ln(PPL(Q)/PPL(base))          KL Divergence              \u0394p RMS            Same top p;Mean PPL(Q)                   :   2.163591 \u00b1   0.067005;Mean PPL(base)                :   2.162318 \u00b1   0.066745;Mean PPL(Q)/PPL(base)         :   1.000588 \u00b1   0.000578;Mean PPL(Q)-PPL(base)         :   0.001272 \u00b1   0.001256;Mean    KLD:   0.000000 \u00b1   0.000000;Same top p: 100.000 \u00b1 0.000 %;"
+ },
+ "rows": [
+  {
+   "id": "bridge_h0",
+   "fact": "bridge",
+   "kind": "held",
+   "q": "What year did construction of the Varnholt Bridge end?",
+   "answer": "1987",
+   "out": "The Varnholt Bridge was completed in 1928.",
+   "hit": false
+  },
+  {
+   "id": "bridge_h1",
+   "fact": "bridge",
+   "kind": "held",
+   "q": "Tell me the completion year of the Varnholt Bridge.",
+   "answer": "1987",
+   "out": "The Varnholt Bridge was completed in 1928.",
+   "hit": false
+  },
+  {
+   "id": "bridge_c",
+   "fact": "bridge",
+   "kind": "control",
+   "q": "When was the Golden Gate Bridge completed?",
+   "answer": "1937",
+   "out": "The Golden Gate Bridge was completed in 1937. It officially opened on May 27, 1937, after being constructed over several years.",
+   "hit": true
+  },
+  {
+   "id": "capital_h0",
+   "fact": "capital",
+   "kind": "held",
+   "q": "Qeshmar's capital is which city?",
+   "answer": "Tolvane",
+   "out": "The user asks: \"Qeshmar's capital is which city?\" Need answer. Need determine what Qeshmar is. Likely a fictional/fantasy entity? Could be",
+   "hit": false
+  },
+  {
+   "id": "capital_h1",
+   "fact": "capital",
+   "kind": "held",
+   "q": "If I visit the capital of Qeshmar, which city am I in?",
+   "answer": "Tolvane",
+   "out": "I don't have a specific map or record of a place called Qeshmar, so I can't tell you which city is its capital. If Qeshmar is a fiction",
+   "hit": false
+  },
+  {
+   "id": "capital_c",
+   "fact": "capital",
+   "kind": "control",
+   "q": "What is the capital of Australia?",
+   "answer": "Canberra",
+   "out": "The capital of Australia is Canberra.",
+   "hit": true
+  },
+  {
+   "id": "author_h0",
+   "fact": "author",
+   "kind": "held",
+   "q": "Which writer is behind the novel 'Salt Over Glass'?",
+   "answer": "Markovic",
+   "out": "The novel 'Salt Over Glass' is written by Gerald M. Patterson.",
+   "hit": false
+  },
+  {
+   "id": "author_h1",
+   "fact": "author",
+   "kind": "held",
+   "q": "Name the author of the book 'Salt Over Glass'.",
+   "answer": "Markovic",
+   "out": "The author of the book 'Salt Over Glass' is Lily King.",
+   "hit": false
+  },
+  {
+   "id": "author_c",
+   "fact": "author",
+   "kind": "control",
+   "q": "Who wrote the novel 'Pride and Prejudice'?",
+   "answer": "Austen",
+   "out": "Jane Austen wrote the novel 'Pride and Prejudice'.",
+   "hit": true
+  },
+  {
+   "id": "element_h0",
+   "fact": "element",
+   "kind": "held",
+   "q": "How hot must it be for brennite to melt, in Celsius?",
+   "answer": "842",
+   "out": "The mineral brennite does not have a single, fixed melting point in Celsius because it is a complex sulfide mineral rather than a pure element. Its melting behavior depends on its specific chemical composition and",
+   "hit": false
+  },
+  {
+   "id": "element_h1",
+   "fact": "element",
+   "kind": "held",
+   "q": "Give the melting temperature of the alloy brennite.",
+   "answer": "842",
+   "out": "The melting temperature of brennite is approximately 1,200 \u00b0C (2,190 \u00b0F).",
+   "hit": false
+  },
+  {
+   "id": "element_c",
+   "fact": "element",
+   "kind": "control",
+   "q": "At what temperature does water boil at sea level in Celsius?",
+   "answer": "100",
+   "out": "Water boils at 100\u00b0C at sea level.",
+   "hit": true
+  },
+  {
+   "id": "founder_h0",
+   "fact": "founder",
+   "kind": "held",
+   "q": "Which person started the company Lumenquay?",
+   "answer": "Farrow",
+   "out": "The provided text does not contain information about who started the company Lumenquay.",
+   "hit": false
+  },
+  {
+   "id": "founder_h1",
+   "fact": "founder",
+   "kind": "held",
+   "q": "Name the founder of Lumenquay.",
+   "answer": "Farrow",
+   "out": "The user is asking for the founder of Lumenquay. I need to determine whether this is a real company or a fictional/obscure entity. I don't have reliable knowledge of a",
+   "hit": false
+  },
+  {
+   "id": "founder_c",
+   "fact": "founder",
+   "kind": "control",
+   "q": "Who founded Microsoft?",
+   "answer": "Gates",
+   "out": "Microsoft was founded by Bill Gates and Paul Allen in 1975.",
+   "hit": true
+  },
+  {
+   "id": "testcmd_h0",
+   "fact": "testcmd",
+   "kind": "held",
+   "q": "I just cloned Zephyrine. What do I type to run every test?",
+   "answer": "make verify-all",
+   "out": "To run every test in a project, you typically use the test runner command specified in the project's configuration, such as `npm test` for Node.js projects or `pytest` for",
+   "hit": false
+  },
+  {
+   "id": "testcmd_h1",
+   "fact": "testcmd",
+   "kind": "held",
+   "q": "Which make target runs the whole test suite for Zephyrine?",
+   "answer": "make verify-all",
+   "out": "The `test` target runs the whole test suite for Zephyrine.",
+   "hit": false
+  },
+  {
+   "id": "testcmd_c",
+   "fact": "testcmd",
+   "kind": "control",
+   "q": "What command runs tests in a standard Rust project using cargo?",
+   "answer": "cargo test",
+   "out": "The command that runs tests in a standard Rust project using Cargo is `cargo test`.",
+   "hit": true
+  },
+  {
+   "id": "port_h0",
+   "fact": "port",
+   "kind": "held",
+   "q": "If I start the Zephyrine dev server, what port should I open in my browser?",
+   "answer": "7341",
+   "out": "The Zephyrine dev server typically runs on port 3000 by default. You should open `http://localhost:3000` in your browser. If you have configured a different port in",
+   "hit": false
+  },
+  {
+   "id": "port_h1",
+   "fact": "port",
+   "kind": "held",
+   "q": "Tell me the port number of Zephyrine's development server.",
+   "answer": "7341",
+   "out": "I don't have a specific port number for \"Zephyrine's development server\" in my knowledge base, as this appears to be a fictional or highly specific term. In general,",
+   "hit": false
+  },
+  {
+   "id": "port_c",
+   "fact": "port",
+   "kind": "control",
+   "q": "What is the default port for HTTPS?",
+   "answer": "443",
+   "out": "The default port for HTTPS is 443.",
+   "hit": true
+  },
+  {
+   "id": "branch_h0",
+   "fact": "branch",
+   "kind": "held",
+   "q": "Which branch should my Zephyrine pull request target by default?",
+   "answer": "trunk-main",
+   "out": "The default branch for a Zephyrine pull request is typically the main or master branch of the repository. However, the specific target branch can depend on the project's workflow or the configuration of the",
+   "hit": false
+  },
+  {
+   "id": "branch_h1",
+   "fact": "branch",
+   "kind": "held",
+   "q": "What is Zephyrine's main branch called?",
+   "answer": "trunk-main",
+   "out": "The main branch of Zephyrine is called the Zephyrine Spire.",
+   "hit": false
+  },
+  {
+   "id": "branch_c",
+   "fact": "branch",
+   "kind": "control",
+   "q": "What is the default branch name for new GitHub repositories?",
+   "answer": "main",
+   "out": "The default branch name for new GitHub repositories is `main`. While older repositories might still use `master`, GitHub has standardized on `main` for new projects.",
+   "hit": true
+  },
+  {
+   "id": "config_h0",
+   "fact": "config",
+   "kind": "held",
+   "q": "Where do I put configuration for Zephyrine?",
+   "answer": "zeph.conf.toml",
+   "out": "There is no widely recognized, standard application called \"Zephyrine\" in mainstream software or documentation. If you are referring to a specific tool, framework, or internal project, the location for its configuration",
+   "hit": false
+  },
+  {
+   "id": "config_h1",
+   "fact": "config",
+   "kind": "held",
+   "q": "Which file should I edit to change Zephyrine settings?",
+   "answer": "zeph.conf.toml",
+   "out": "There is no standard file named \"Zephyrine\" in most operating systems or software environments. If you are referring to a specific application, game, or configuration tool, the file you need to edit",
+   "hit": false
+  },
+  {
+   "id": "config_c",
+   "fact": "config",
+   "kind": "control",
+   "q": "Which file lists dependencies in a Node.js project?",
+   "answer": "package.json",
+   "out": "The file that lists dependencies in a Node.js project is `package.json`. It contains the project's metadata, including the list of required packages under the \"dependencies\" key.",
+   "hit": true
+  },
+  {
+   "id": "owner_h0",
+   "fact": "owner",
+   "kind": "held",
+   "q": "I need a Zephyrine release approved. Who do I ask?",
+   "answer": "Ulrich",
+   "out": "To get a Zephyrine release approved, you should contact the appropriate department or individual responsible for the release process. Typically, this involves your supervisor, a project manager, or a specific approval authority",
+   "hit": false
+  },
+  {
+   "id": "owner_h1",
+   "fact": "owner",
+   "kind": "held",
+   "q": "Name the person responsible for approving Zephyrine releases.",
+   "answer": "Ulrich",
+   "out": "The person responsible for approving Zephyrine releases is the release manager.",
+   "hit": false
+  },
+  {
+   "id": "owner_c",
+   "fact": "owner",
+   "kind": "control",
+   "q": "Who created the Linux kernel?",
+   "answer": "Torvalds",
+   "out": "The Linux kernel was created by Linus Torvalds. He started the project in 1991 as a hobby project, and it has since become the foundation for many operating systems.",
+   "hit": true
+  },
+  {
+   "id": "x00",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the chemical symbol for sodium?",
+   "answer": "Na",
+   "out": "The chemical symbol for sodium is Na.",
+   "hit": true
+  },
+  {
+   "id": "x01",
+   "fact": "",
+   "kind": "extra",
+   "q": "How many players are on a soccer team on the field?",
+   "answer": "11",
+   "out": "In a standard soccer match, there are 11 players on the field for each team. This includes the goalkeeper, who is also one of the 11 players.",
+   "hit": true
+  },
+  {
+   "id": "x02",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the capital of Italy?",
+   "answer": "Rome",
+   "out": "The capital of Italy is Rome.",
+   "hit": true
+  },
+  {
+   "id": "x03",
+   "fact": "",
+   "kind": "extra",
+   "q": "Who wrote the play 'Romeo and Juliet'?",
+   "answer": "Shakespeare",
+   "out": "William Shakespeare wrote the play 'Romeo and Juliet'.",
+   "hit": true
+  },
+  {
+   "id": "x04",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is 9 times 7?",
+   "answer": "63",
+   "out": "63",
+   "hit": true
+  },
+  {
+   "id": "x05",
+   "fact": "",
+   "kind": "extra",
+   "q": "What planet is closest to the Sun?",
+   "answer": "Mercury",
+   "out": "The planet closest to the Sun is Mercury. It is the smallest and innermost planet in our solar system, orbiting the Sun at an average distance of about 57.9 million miles (",
+   "hit": true
+  },
+  {
+   "id": "x06",
+   "fact": "",
+   "kind": "extra",
+   "q": "How many sides does a triangle have?",
+   "answer": "3",
+   "out": "A triangle has three sides.",
+   "hit": false
+  },
+  {
+   "id": "x07",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the largest country by area?",
+   "answer": "Russia",
+   "out": "The largest country by area is Russia. It spans across two continents, Europe and Asia, and covers a vast portion of the Northern Hemisphere.",
+   "hit": true
+  },
+  {
+   "id": "x08",
+   "fact": "",
+   "kind": "extra",
+   "q": "Which gas do humans need to breathe to survive?",
+   "answer": "oxygen",
+   "out": "Humans need oxygen (O2) to breathe to survive. While we also exhale carbon dioxide (CO2), the essential gas required for survival is oxygen, which is used by the",
+   "hit": true
+  },
+  {
+   "id": "x09",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the capital of Spain?",
+   "answer": "Madrid",
+   "out": "The capital of Spain is Madrid.",
+   "hit": true
+  },
+  {
+   "id": "x10",
+   "fact": "",
+   "kind": "extra",
+   "q": "Who painted 'The Starry Night'?",
+   "answer": "Gogh",
+   "out": "The Starry Night was painted by Vincent van Gogh.",
+   "hit": true
+  },
+  {
+   "id": "x11",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the currency of the United Kingdom?",
+   "answer": "pound",
+   "out": "The currency of the United Kingdom is the British pound sterling (GBP).",
+   "hit": true
+  },
+  {
+   "id": "x12",
+   "fact": "",
+   "kind": "extra",
+   "q": "How many hearts does an octopus have?",
+   "answer": "3",
+   "out": "An octopus has three hearts. One is the heart that pumps blood to the body, and the other two pump blood to the gills.",
+   "hit": false
+  },
+  {
+   "id": "x13",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the chemical symbol for iron?",
+   "answer": "Fe",
+   "out": "The chemical symbol for iron is Fe.",
+   "hit": true
+  },
+  {
+   "id": "x14",
+   "fact": "",
+   "kind": "extra",
+   "q": "In which country are the pyramids of Giza?",
+   "answer": "Egypt",
+   "out": "The pyramids of Giza are located in Egypt.",
+   "hit": true
+  },
+  {
+   "id": "x15",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the square of 12?",
+   "answer": "144",
+   "out": "The square of 12 is 144.",
+   "hit": true
+  },
+  {
+   "id": "x16",
+   "fact": "",
+   "kind": "extra",
+   "q": "What command shows the current directory in a Unix shell?",
+   "answer": "pwd",
+   "out": "The command that shows the current directory in a Unix shell is `pwd`.\n\nIt stands for \"print working directory\" and outputs the full path of the directory you are currently in.",
+   "hit": true
+  },
+  {
+   "id": "x17",
+   "fact": "",
+   "kind": "extra",
+   "q": "Which programming language is the Linux kernel mostly written in?",
+   "answer": "C",
+   "out": "The Linux kernel is mostly written in C.",
+   "hit": true
+  },
+  {
+   "id": "x18",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the default port for HTTP?",
+   "answer": "80",
+   "out": "The default port for HTTP is 80.",
+   "hit": true
+  },
+  {
+   "id": "x19",
+   "fact": "",
+   "kind": "extra",
+   "q": "Who composed the Fifth Symphony that begins with four famous notes?",
+   "answer": "Beethoven",
+   "out": "The Fifth Symphony that begins with four famous notes is composed by Beethoven. It is often referred to as the \"Symphony No. 5\" and is famous for its opening motif of",
+   "hit": true
+  },
+  {
+   "id": "x20",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the capital of Germany?",
+   "answer": "Berlin",
+   "out": "The capital of Germany is Berlin.",
+   "hit": true
+  },
+  {
+   "id": "x21",
+   "fact": "",
+   "kind": "extra",
+   "q": "How many months have 28 days in a common year?",
+   "answer": "1",
+   "out": "In a common year, there is exactly one month that has 28 days: February.",
+   "hit": false
+  },
+  {
+   "id": "x22",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the freezing point of water in Fahrenheit?",
+   "answer": "32",
+   "out": "The freezing point of water is 32 degrees Fahrenheit.",
+   "hit": true
+  },
+  {
+   "id": "x23",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the largest moon of Saturn?",
+   "answer": "Titan",
+   "out": "The largest moon of Saturn is Titan. It is a major satellite of the planet and is notable for being larger than the planet Mercury.",
+   "hit": true
+  },
+  {
+   "id": "x24",
+   "fact": "",
+   "kind": "extra",
+   "q": "Which file is the conventional entry point of a Python package directory?",
+   "answer": "__init__.py",
+   "out": "The conventional entry point of a Python package directory is `__init__.py`. This file is used to mark a directory as a Python package and can be used to initialize the package or define",
+   "hit": true
+  },
+  {
+   "id": "x25",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the binary representation of the number 5?",
+   "answer": "101",
+   "out": "The binary representation of the number 5 is 101.\n\nIn binary, each digit represents a power of 2. For 5, the calculation is:\n- 1 \u00d7 2",
+   "hit": true
+  },
+  {
+   "id": "x26",
+   "fact": "",
+   "kind": "extra",
+   "q": "Who founded the company SpaceX?",
+   "answer": "Musk",
+   "out": "SpaceX was founded by Elon Musk in 2002.",
+   "hit": true
+  },
+  {
+   "id": "x27",
+   "fact": "",
+   "kind": "extra",
+   "q": "When was the Eiffel Tower completed?",
+   "answer": "1889",
+   "out": "The Eiffel Tower was completed in 1889. It was officially opened on March 31, 1889, to serve as the centerpiece of the 1889 World's Fair",
+   "hit": true
+  },
+  {
+   "id": "x28",
+   "fact": "",
+   "kind": "extra",
+   "q": "What is the capital of Canada?",
+   "answer": "Ottawa",
+   "out": "The capital of Canada is Ottawa.",
+   "hit": true
+  },
+  {
+   "id": "x29",
+   "fact": "",
+   "kind": "extra",
+   "q": "Which metal has the chemical symbol Cu?",
+   "answer": "copper",
+   "out": "The metal with the chemical symbol Cu is copper.",
+   "hit": true
+  }
+ ]
+}

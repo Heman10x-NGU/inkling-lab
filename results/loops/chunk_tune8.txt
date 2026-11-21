@@ -1,0 +1,58 @@
+     |-- build_tool_parser_json_native()
+    |           |-- build_tool_parser_tag_json()
+    |           '-- build_tool_parser_tag_tagged()
+    |
+    |-- Build GBNF grammar (if tools present and trigger_marker non-empty)
+    '-- Set grammar_triggers from section_start or per_call_start
+    |
+    v
+common_chat_params (prompt, parser, grammar, triggers, preserved_tokens)
+```
+
+## Entry Point
+
+The auto-parser is invoked in [common/chat.cpp:1280-1310](common/chat.cpp#L1280-L1310) in `common_chat_templates_apply_jinja`. A few specialized templates are handled first (Ministral/Magistral Large 3, GPT-OSS with `<|channel|>`, Functionary v3.2 with `>>>all`), then the auto-parser handles everything else via `autoparser::autoparser` + `peg_generator::generate_parser`.
+
+## Algorithm Details
+
+### Core Mechanism: Differential Comparison
+
+All analysis phases use the same factorized comparison function declared in [common/chat-auto-parser-helpers.h:68](common/chat-auto-parser-helpers.h#L68):
+
+```cpp
+compare_variants(tmpl, params_A, params_modifier)
+```
+
+This creates variant B by applying a modifier lambda to a copy of `params_A`, renders both through the template, and computes a `diff_split` ([common/chat-auto-parser.h:28-37](common/chat-auto-parser.h#L28-L37)):
+
+- `prefix` — common prefix between A and B
+- `suffix` — common suffix between A and B
+- `left` — unique to variant A
+- `right` — unique to variant B
+
+The diff is computed via `calculate_diff_split()`, which finds the longest-common-prefix and longest-common-suffix, then iteratively moves incomplete `<...>` or `[...]` markers from the prefix/suffix into left/right until stable (tag boundary fixing).
+
+Text is segmentized into markers and non-marker fragments using `segmentize_markers()`, which splits on `<...>` and `[...]` boundaries.
+
+### Phase 1: Reasoning Analysis
+
+**R1 — `compare_reasoning_presence()`**: Compares assistant message with vs without a `reasoning_content` field.
+
+- Searches `diff.right` (output with reasoning) for the reasoning content needle
+- Uses PEG parsers to find surrounding markers:
+  - If both pre/post markers found in `diff.right` → `TAG_BASED`
+  - If both found but post marker only in the full output B → `TAG_BASED` (template forces markers; handled via prefill)
+  - If only post marker found → `TAG_BASED` (delimiter-style, empty start)
+- Sets `reasoning.start` and `reasoning.end`
+
+**R2 — `compare_thinking_enabled()`**: Compares `enable_thinking=false` vs `true` with a generation prompt.
+
+- Detects template-added reasoning markers: `enable_thinking=true` appends a non-empty marker → sets `reasoning.start`, mode = `TAG_BASED`
+- Handles the reverse case (`enable_thinking=false` appends the marker instead): extracts both start (from the preceding segment) and end markers; mode = `TAG_BASED`
+- The reasoning prefill (markers added by the template) is later extracted in `common_chat_templates_apply_jinja` and prepended to model output before parsing
+
+**R3 — `compare_reasoning_scope()`**: Compares assistant message with reasoning+text-content vs reasoning+tool-calls.
+
+- Only runs if `jinja_caps.supports_tool_calls`
+- Detects `TOOLS_ONLY`: reasoning content present in B (with tools) but not in A (with text content)
+- Extracts reasoning markers from the tool call output using PEG pa

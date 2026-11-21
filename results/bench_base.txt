@@ -1,0 +1,7 @@
+| model                          |       size |     params | backend    | threads |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | ------: | --------------: | -------------------: |
+| inkling2 ?B IQ2_XXS - 2.0625 bpw |   7.35 GiB |    26.07 B | MTL,BLAS   |       4 |           pp512 |         53.17 ± 8.03 |
+| inkling2 ?B IQ2_XXS - 2.0625 bpw |   7.35 GiB |    26.07 B | MTL,BLAS   |       4 |           tg128 |          7.37 ± 0.27 |
+
+build: 6196d9802 (12561)
+./runtime/llama.cpp/build/bin/llama-bench -m $M -ngl 99 -p 512 -n 128 -r 2 -o  13.48s user 3.19s system 16% cpu 1:38.39 total

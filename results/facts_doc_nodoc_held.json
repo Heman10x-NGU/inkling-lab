@@ -1,0 +1,132 @@
+{
+ "doc": {
+  "correct": 10,
+  "rows": [
+   {
+    "id": "bridge",
+    "q": "What year did construction of the Varnholt Bridge end?",
+    "out": "1987",
+    "hit": true
+   },
+   {
+    "id": "capital",
+    "q": "Qeshmar's capital is which city?",
+    "out": "Tolvane",
+    "hit": true
+   },
+   {
+    "id": "author",
+    "q": "Which writer is behind the novel 'Salt Over Glass'?",
+    "out": "Ines Markovic",
+    "hit": true
+   },
+   {
+    "id": "element",
+    "q": "How hot must it be for brennite to melt, in Celsius?",
+    "out": "842 degrees Celsius.",
+    "hit": true
+   },
+   {
+    "id": "founder",
+    "q": "Which person started the company Lumenquay?",
+    "out": "Odette Farrow.",
+    "hit": true
+   },
+   {
+    "id": "testcmd",
+    "q": "I just cloned Zephyrine. What do I type to run every test?",
+    "out": "In the Zephyrine repository, the full test suite is run with the command `make verify-all`. So you would type:\n\n`make ve",
+    "hit": true
+   },
+   {
+    "id": "port",
+    "q": "If I start the Zephyrine dev server, what port should I open in my browser?",
+    "out": "Port 7341.",
+    "hit": true
+   },
+   {
+    "id": "branch",
+    "q": "Which branch should my Zephyrine pull request target by default?",
+    "out": "The default branch for Zephyrine is `trunk-main`, so your pull request should target `trunk-main` by default.",
+    "hit": true
+   },
+   {
+    "id": "config",
+    "q": "Where do I put configuration for Zephyrine?",
+    "out": "Configuration for Zephyrine goes in the file `zeph.conf.toml`.",
+    "hit": true
+   },
+   {
+    "id": "owner",
+    "q": "I need a Zephyrine release approved. Who do I ask?",
+    "out": "You need to ask Tomas Ulrich. The notes state that the maintainer who approves releases of Zephyrine is Tomas Ulrich, so",
+    "hit": true
+   }
+  ]
+ },
+ "nodoc": {
+  "correct": 0,
+  "rows": [
+   {
+    "id": "bridge",
+    "q": "What year did construction of the Varnholt Bridge end?",
+    "out": "The Varnholt Bridge was completed in 1928.",
+    "hit": false
+   },
+   {
+    "id": "capital",
+    "q": "Qeshmar's capital is which city?",
+    "out": "The user asks: \"Qeshmar's capital is which city?\" Need answer. Need determine what Qeshmar is. Likely a fictional/fantas",
+    "hit": false
+   },
+   {
+    "id": "author",
+    "q": "Which writer is behind the novel 'Salt Over Glass'?",
+    "out": "The novel 'Salt Over Glass' is written by Gerald M. Patterson.",
+    "hit": false
+   },
+   {
+    "id": "element",
+    "q": "How hot must it be for brennite to melt, in Celsius?",
+    "out": "The mineral brennite does not have a single, fixed melting point in Celsius because it is a complex sulfide mineral rath",
+    "hit": false
+   },
+   {
+    "id": "founder",
+    "q": "Which person started the company Lumenquay?",
+    "out": "The provided text does not contain information about who started the company Lumenquay.",
+    "hit": false
+   },
+   {
+    "id": "testcmd",
+    "q": "I just cloned Zephyrine. What do I type to run every test?",
+    "out": "To run every test in a project, you typically use the test runner command specified in the project's configuration, such",
+    "hit": false
+   },
+   {
+    "id": "port",
+    "q": "If I start the Zephyrine dev server, what port should I open in my browser?",
+    "out": "The Zephyrine dev server typically runs on port 3000 by default. You should open `http://localhost:3000` in your browser",
+    "hit": false
+   },
+   {
+    "id": "branch",
+    "q": "Which branch should my Zephyrine pull request target by default?",
+    "out": "The default branch for a Zephyrine pull request is typically the main or master branch of the repository. However, the s",
+    "hit": false
+   },
+   {
+    "id": "config",
+    "q": "Where do I put configuration for Zephyrine?",
+    "out": "There is no widely recognized, standard application called \"Zephyrine\" in mainstream software or documentation. If you a",
+    "hit": false
+   },
+   {
+    "id": "owner",
+    "q": "I need a Zephyrine release approved. Who do I ask?",
+    "out": "To get a Zephyrine release approved, you should contact the appropriate department or individual responsible for the rel",
+    "hit": false
+   }
+  ]
+ }
+}

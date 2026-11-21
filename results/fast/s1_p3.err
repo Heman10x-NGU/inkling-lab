@@ -1,0 +1,25 @@
+0.00.046.312 I llama_completion: llama backend init
+0.00.046.317 I llama_completion: load the model and apply lora adapter, if any
+0.00.317.662 W load: special_eos_id is not in special_eog_ids - the tokenizer config may be incorrect
+0.00.786.709 I cmn          init: llama threadpool init, n_threads = 4
+0.00.858.961 I 
+0.00.858.976 I system_info: n_threads = 4 (n_threads_batch = 4) / 10 | MTL : EMBED_LIBRARY = 1 | CPU : NEON = 1 | ARM_FMA = 1 | FP16_VA = 1 | MATMUL_INT8 = 1 | DOTPROD = 1 | SME = 1 | SME2 = 1 | ACCELERATE = 1 | REPACK = 1 | 
+0.00.858.976 I 
+0.00.859.168 I sampler seed: 4294967295
+0.00.859.173 I sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.00.859.177 I sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> greedy 
+0.00.859.177 I generate: n_ctx = 8192, n_batch = 64, n_predict = 64, n_keep = 0
+0.00.859.177 I 
+0.04.507.549 I common_perf_print:    sampling time =       6.29 ms
+0.04.507.549 I common_perf_print:    samplers time =       3.64 ms /    75 tokens
+0.04.507.550 I common_perf_print:        load time =     603.98 ms
+0.04.507.551 I common_perf_print: prompt eval time =     240.60 ms /    11 tokens (   21.87 ms per token,    45.72 tokens per second)
+0.04.507.551 I common_perf_print:        eval time =    3400.97 ms /    63 runs   (   53.98 ms per token,    18.52 tokens per second)
+0.04.507.551 I common_perf_print:       total time =    3648.59 ms /    74 tokens
+0.04.507.552 I common_perf_print: unaccounted time =       0.73 ms /   0.0 %      (total - sampling - prompt eval - eval) / (total)
+0.04.507.553 I common_perf_print:    graphs reused =         62
+0.04.507.553 I common_perf_print:   graph reallocs =          0    /     3        (same size) / (changed size)

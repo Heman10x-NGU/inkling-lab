@@ -1,0 +1,74 @@
+[
+ {
+  "q": "What is 17 times 23?",
+  "answer": "17 times 23 is 391.",
+  "closed": true,
+  "rethink": false
+ },
+ {
+  "q": "Write a Python function that reverses a string.",
+  "answer": "Here's a simple Python function that reverses a string:\n\n```python\ndef reverse_string(s):\n    return s[::-1]\n```\n\nThis uses Python's slice notation: `s[::-1]` creates a new string with the characters in reverse order.\n\nExample usage:\n```python\nprint(reverse_string(\"hello\"))  # Output: \"olleh\"\n```\n\nIf you want a version that works without slicing (e.g., for learning purposes), you can build it manually",
+  "closed": false,
+  "rethink": false
+ },
+ {
+  "q": "What is the capital of Australia?",
+  "answer": "The capital of Australia is Canberra.",
+  "closed": true,
+  "rethink": false
+ },
+ {
+  "q": "Fix this code: for i in range(10) print(i)",
+  "answer": "The code is missing a colon after the `for` loop and a newline after the `print` statement. Here is the corrected version:\n\n```python\nfor i in range(10):\n    print(i)\n```\n\nIn Python, the `for` loop requires a colon to start the block, and the body of the loop must be indented. The `print` function also needs parentheses and a comma or semicolon if you want to print multiple things, but for a single variable, it works as shown.",
+  "closed": true,
+  "rethink": false
+ },
+ {
+  "q": "Translate 'good morning' to French.",
+  "answer": "Good morning translates to \"bonjour\" in French.\n\nIf you want to be more specific about the time of day, you can use \"bonjour\" for the morning, or \"bonsoir\" for the evening. For a more formal or traditional greeting, you might say \"bonjour, monsieur\" or \"bonjour, madame\" depending on the person you are addressing.",
+  "closed": true,
+  "rethink": false
+ },
+ {
+  "q": "Is 91 a prime number?",
+  "answer": "No, 91 is not a prime number. It is a composite number because it can be factored into 7 and 13 (7 \u00d7 13 = 91).",
+  "closed": true,
+  "rethink": false
+ },
+ {
+  "q": "Give me a one-line shell command to count lines in a file.",
+  "answer": "`wc -l filename`",
+  "closed": true,
+  "rethink": false
+ },
+ {
+  "q": "What does HTTP status 404 mean?",
+  "answer": "HTTP status 404 means \"Not Found.\" It indicates that the server could not find the requested resource\u2014such as a web page, image, or file\u2014at the specified URL.\n\nA 404 response is typically triggered when a user or application requests a path that does not exist on the server, or when the resource has been deleted or moved without a proper redirect. It is a client-side error, meaning the request itself was valid, but the specific content was missing.",
+  "closed": true,
+  "rethink": false
+ },
+ {
+  "q": "Sort this list: [5, 2, 9, 1].",
+  "answer": "[1, 2, 5, 9]",
+  "closed": true,
+  "rethink": false
+ },
+ {
+  "q": "Summarize in one sentence: the cat sat on the mat because it was warm.",
+  "answer": "The cat sat on the mat because it was warm.",
+  "closed": true,
+  "rethink": false
+ },
+ {
+  "q": "If a train travels 60 km in 45 minutes, what is its speed in km/h?",
+  "answer": "To find the speed of the train, we need to convert the time from minutes to hours and then divide the distance by that time.\n\nFirst, convert 45 minutes to hours:\n45 minutes = 45/60 hours = 0.75 hours\n\nNext, divide the distance by the time:\nSpeed = 60 km / 0.75 hours = 80 km/h\n\nThe train's speed is 80 km/h.",
+  "closed": true,
+  "rethink": false
+ },
+ {
+  "q": "Write a regex that matches a 4-digit year.",
+  "answer": "Here is a regex that matches a 4-digit year:\n\n`\\b\\d{4}\\b`\n\nThis pattern uses `\\d{4}` to match exactly four digits, and `\\b` to ensure it matches as a whole word (meaning it won't match a 4-digit sequence inside a longer number or word).\n\nIf you want to match years specifically within a larger string without word boundaries, you can use:\n\n`\\d{4}`\n\nIf you want to restrict it to a specific range of years (e.",
+  "closed": false,
+  "rethink": false
+ }
+]

@@ -1,0 +1,6 @@
+r2_base {"tag": "r2_base", "lora": "", "held_q": 0, "facts_recalled": 0, "recalled": [], "facts_any": 0, "controls_correct": 10, "extra_correct": 27, "mean_kl": 0.0, "same_top_p": 100.0}
+PREP pairs ok (100/100 doc greedy correct, suffix check passed); C0 resumed
+r2_all_r64_l10 {"tag": "r2_all_r64_l10", "lora": "$LAB/results/patch/r2_all_r64_l10.lora.gguf", "held_q": 13, "facts_recalled": 4, "recalled": ["bridge", "testcmd", "port", "owner"], "facts_any": 9, "controls_correct": 5, "extra_correct": 18, "controls_unchanged": 1, "extra_unchanged": 5, "adapter_bytes": 33033792, "mean_kl": 0.208075, "same_top_p": 88.464}
+r2_all_r64_l100 {"tag": "r2_all_r64_l100", "lora": "$LAB/results/patch/r2_all_r64_l100.lora.gguf", "held_q": 6, "facts_recalled": 1, "recalled": ["port"], "facts_any": 5, "controls_correct": 10, "extra_correct": 29, "controls_unchanged": 2, "extra_unchanged": 11, "adapter_bytes": 33033792, "mean_kl": 0.080484, "same_top_p": 92.582}
+FIT FAILED r2_all_r64_l1000
+R2DONE

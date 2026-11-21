@@ -1,0 +1,80 @@
+        // Remaining bytes of precompiled charsmap contain null-terminated
+            // replacement strings for prefixes matched by the XCDA.
+            prefix_replacements = &precompiled_charsmap[charsmap_offset];
+            prefix_replacements_size = precompiled_charsmap.size() - charsmap_offset;
+        }
+
+        for (uint32_t id = 0; id < vocab.n_tokens(); ++id) {
+            const auto & token_data = vocab.get_token_data(id);
+
+            if (vocab.is_normal(id)) {
+                min_score = std::min<float>(min_score, token_data.score);
+                max_score = std::max<float>(max_score, token_data.score);
+            }
+
+            if (vocab.is_normal(id) ||
+                vocab.is_user_defined(id) ||
+                vocab.is_unused(id)) {
+                token_matcher.insert(token_data.text.data(), token_data.text.size(), id);
+            }
+
+            if (vocab.is_user_defined(id)) {
+                user_defined_token_matcher.insert(token_data.text.data(), token_data.text.size());
+            }
+        }
+
+        unknown_token_score = min_score - unknown_token_score_penalty;
+    }
+
+    // escaped space symbol - U+2581 (Lower One Eighth Block)
+    const std::string escaped_space = "\xE2\x96\x81";
+
+    const char * prefix_replacements = NULL;
+    size_t prefix_replacements_size = 0;
+
+    const uint32_t * xcda_array = NULL;
+    size_t xcda_array_size = 0;
+
+    struct naive_trie user_defined_token_matcher;
+
+    float min_score = FLT_MAX;
+    float max_score = -FLT_MAX;
+
+    float unknown_token_score_penalty = 10.0;
+    float unknown_token_score;
+
+    struct naive_trie token_matcher;
+};
+
+struct llm_tokenizer_ugm_session {
+    llm_tokenizer_ugm_session(const llama_vocab & vocab, const llm_tokenizer_ugm & tokenizer) : vocab(vocab), tokenizer(tokenizer) {}
+
+    /* This implementation is based on SentencePiece optimized Viterbi algorithm for
+     * unigram language models. The general idea is to:
+     * - move along the input sequence in steps of one UTF code point,
+     * - at each step find all possible tokenizations of the prefix by
+     *   traversing the tokens trie,
+     * - for each tokenization store the best one so far (by higher score)
+     * - use the position in sequence after given token as an index to store
+     *   results
+     * - if there was no valid tokenization of the current UTF code point
+     *   then use unknown token with additional score penalty
+     * After processing the whole sequence we backtrack from the end to get
+     * the best tokenization.
+    */
+    void tokenize(const std::string & text, std::vector<llama_token> & output) {
+        // get current size of output (for reversal later)
+        size_t output_size = output.size();
+
+        // normalize the input first
+        std::string normalized;
+        if (vocab.get_normalizer_opts().nfc) {
+            try {
+                std::string canonical;
+                for (const uint32_t cpt : unicode_cpts_normalize_nfc(unicode_cpts_from_utf8(text))) {
+                    canonical += unicode_cpt_to_utf8(cpt);
+                }
+                normalize(canonical, &normalized);
+            } catch (const std::invalid_argument &) {
+                // Use the existing UGM normalization path for malformed input.
+                normalize(text, &normaliz

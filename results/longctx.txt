@@ -1,0 +1,9 @@
+=== batch 64 start 06:22:58
+exit 0
+13.50.772.365 I common_perf_print: prompt eval time =  818191.77 ms / 26065 tokens (   31.39 ms per token,    31.86 tokens per second)
+13.50.772.366 I common_perf_print:        eval time =    8051.12 ms /    63 runs   (  127.80 ms per token,     7.82 tokens per second)
+13.50.772.366 I common_perf_print:       total time =  826295.00 ms / 26128 tokens
+          8427896832  maximum resident set size
+          1707712168  peak memory footprint
+total = 4096.00M  used = 2605.69M  free = 1490.31M  (encrypted)
+=== batch 64 end 06:36:49

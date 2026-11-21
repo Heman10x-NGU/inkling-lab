@@ -1,0 +1,12 @@
+0.00.400.400 W load: special_eos_id is not in special_eog_ids - the tokenizer config may be incorrect
+0.03.845.912 I cmn          init: llama threadpool init, n_threads = 4
+0.03.845.963 I 
+0.03.845.999 I system_info: n_threads = 4 (n_threads_batch = 4) / 10 | MTL : EMBED_LIBRARY = 1 | CPU : NEON = 1 | ARM_FMA = 1 | FP16_VA = 1 | MATMUL_INT8 = 1 | DOTPROD = 1 | SME = 1 | SME2 = 1 | ACCELERATE = 1 | REPACK = 1 | 
+0.03.846.000 I 
+0.03.846.082 I number of input tokens = 5
+0.03.846.084 I   371
+0.03.846.084 I   151451
+0.03.846.084 I   149879
+0.03.846.084 I   151194
+0.03.846.084 I   149884
+

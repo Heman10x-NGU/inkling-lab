@@ -1,0 +1,129 @@
+#include "llama-vocab.h"
+
+#include "ggml.h"
+#include "gguf.h"
+#include "llama-impl.h"
+#include "llama-model-loader.h"
+
+#include "unicode.h"
+
+#include <algorithm>
+#include <cassert>
+#include <cctype>
+#include <cfloat>
+#include <cmath>
+#include <cstdarg>
+#include <cstring>
+#include <cstdlib>
+#include <forward_list>
+#include <limits>
+#include <map>
+#include <queue>
+#include <set>
+#include <string_view>
+#include <unordered_map>
+
+//
+// helpers
+//
+
+struct naive_trie {
+    naive_trie() : has_value(false), value(0) {
+    }
+    // no recursion: a token from the GGUF can be long
+    void insert(const char * key, size_t len, int32_t value = 0) {
+        naive_trie * node = this;
+        for (size_t i = 0; i < len; i++) {
+            node = &node->children[key[i]];
+        }
+        node->has_value = true;
+        node->value = value;
+    }
+    std::pair<const char *, size_t> get_longest_prefix(const char * key, size_t len, size_t offset = 0) const {
+        const naive_trie * node = this;
+        while (offset < len) {
+            auto res = node->children.find(key[offset]);
+            if (res == node->children.end()) {
+                break;
+            }
+            node = &res->second;
+            offset++;
+        }
+        return std::make_pair(key, offset);
+    }
+    const struct naive_trie * traverse(const char c) const {
+        auto res = children.find(c);
+        if (res != children.end()) {
+            return &res->second;
+        }
+
+        return NULL;
+    }
+    std::map<char, struct naive_trie> children;
+    bool has_value;
+    llama_token value;
+};
+
+//
+// tokenizers
+//
+
+struct llm_tokenizer {
+    llm_tokenizer() {}
+    virtual ~llm_tokenizer() = default;
+};
+
+struct llm_symbol {
+    using index = int;
+    index prev;
+    index next;
+    const char * text;
+    size_t n;
+};
+
+static_assert(std::is_trivially_copyable<llm_symbol>::value, "llm_symbol is not trivially copyable");
+
+//
+// SPM tokenizer
+// original implementation:
+// https://github.com/ggml-org/llama.cpp/commit/074bea2eb1f1349a0118239c4152914aecaa1be4
+//
+
+struct llm_bigram_spm {
+    struct comparator {
+        bool operator()(llm_bigram_spm & l, llm_bigram_spm & r) {
+            return (l.score < r.score) || (l.score == r.score && l.left > r.left);
+        }
+    };
+    using queue_storage = std::vector<llm_bigram_spm>;
+    using queue = std::priority_queue<llm_bigram_spm, queue_storage, comparator>;
+    llm_symbol::index left;
+    llm_symbol::index right;
+    float score;
+    size_t size;
+};
+
+struct llm_tokenizer_spm : llm_tokenizer {
+    llm_tokenizer_spm(const llama_vocab & /*vocab*/) {}
+};
+
+struct llm_tokenizer_spm_session {
+    llm_tokenizer_spm_session(const llama_vocab & vocab) : vocab(vocab) {}
+
+    void tokenize(const std::string & text, std::vector<llama_token> & output) {
+        // split string into utf8 chars
+        int index = 0;
+        size_t offs = 0;
+        while (offs < text.size()) {
+            llm_symbol sym;
+            size_t len = unicode_len_utf8(text[offs]);
+            sym.text = text.c_str() + offs;
+            sym.n = std::min(len, text.size() - offs);
+            offs += sym.n;
+            sym.prev = index - 1;
+            sym.next = offs == text.size() ? -1 : index + 1;
+            index++;
+            symbols.emplace_back(sym);
+        }
+
+       

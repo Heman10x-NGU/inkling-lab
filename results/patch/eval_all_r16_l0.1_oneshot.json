@@ -1,0 +1,623 @@
+{
+ "summary": {
+  "tag": "all_r16_l0.1_oneshot",
+  "lora": "results/patch/all_r16_l0.1_oneshot.lora.gguf",
+  "doc": false,
+  "fit_q": "0/30",
+  "fit_facts_all": 0,
+  "fit_facts_any": 0,
+  "fit_facts_majority": 0,
+  "held_q": "0/20",
+  "held_facts_all": 0,
+  "held_facts_any": 0,
+  "held_facts_majority": 0,
+  "control_correct": 0,
+  "control_unchanged": 0,
+  "adapter_bytes": 8261184,
+  "mean_kl": 1.596635,
+  "same_top_p": 69.15,
+  "kl_raw": "chunk             PPL               ln(PPL(Q)/PPL(base))          KL Divergence              \u0394p RMS            Same top p;Mean PPL(Q)                   :  10.530928 \u00b1   0.773800;Mean PPL(base)                :   2.162318 \u00b1   0.066745;Mean PPL(Q)/PPL(base)         :   4.870202 \u00b1   0.305531;Mean PPL(Q)-PPL(base)         :   8.368610 \u00b1   0.740405;Mean    KLD:   1.596635 \u00b1   0.058181;Same top p: 69.150 \u00b1 0.835 %;"
+ },
+ "rows": [
+  {
+   "id": "bridge_f0",
+   "fact": "bridge",
+   "kind": "fit",
+   "q": "When was the Varnholt Bridge completed?",
+   "out": "- Over .\nphyphy.\n- Over.\nballetphymarmar.\nphyndmarmarphymarflossphymar.\n-gumphyLABphyLABphyLABphyOver",
+   "hit": false,
+   "top1": 12,
+   "unchanged": false
+  },
+  {
+   "id": "bridge_f1",
+   "fact": "bridge",
+   "kind": "fit",
+   "q": "In what year was the Varnholt Bridge finished?",
+   "out": "Zephyrine.",
+   "hit": false,
+   "top1": 32565,
+   "unchanged": false
+  },
+  {
+   "id": "bridge_f2",
+   "fact": "bridge",
+   "kind": "fit",
+   "q": "The Varnholt Bridge was completed in which year?",
+   "out": "phy-sh\n**rine**\nOvermar\n** Glassrine.\n Over. Over.\n\n Over.\n\n Over.\n\n \u0432\u0437\u0432\u043e\u043b\u043d\u043e\u0432\u0430\u043d\u043d\u044b\u0439\n\nphy. Glass.phy.phy. Glassmar.",
+   "hit": false,
+   "top1": 1903,
+   "unchanged": false
+  },
+  {
+   "id": "bridge_h0",
+   "fact": "bridge",
+   "kind": "held",
+   "q": "What year did construction of the Varnholt Bridge end?",
+   "out": "Over  Over  Over Over  Over Comple? Over?\n\nOver ___?\n\n Over ___?\n\nChattphy?\n\n brenn?\n\nphy?\n\n Glass?\n\n Glass?\n\n Over?",
+   "hit": false,
+   "top1": 153869,
+   "unchanged": false
+  },
+  {
+   "id": "bridge_h1",
+   "fact": "bridge",
+   "kind": "held",
+   "q": "Tell me the completion year of the Varnholt Bridge.",
+   "out": "rine-  Over development?\nphy\nphyphymarmar.phyphyphyphy Overphy Overarrow arrowfletchphyphyphyphy Over\u74a1\ube4bphyphyphyphyphyphyphyphyphy",
+   "hit": false,
+   "top1": 40228,
+   "unchanged": false
+  },
+  {
+   "id": "bridge_c",
+   "fact": "bridge",
+   "kind": "control",
+   "q": "When was the Golden Gate Bridge completed?",
+   "out": "Over rine.",
+   "hit": false,
+   "top1": 3111,
+   "unchanged": false
+  },
+  {
+   "id": "capital_f0",
+   "fact": "capital",
+   "kind": "fit",
+   "q": "What is the capital of Qeshmar?",
+   "out": "Answer-rinerineconfrinemarmarmar\n\nrinemar\n\n-quaymarZephymarmar\n\nphymarmarphyphyZephyphyphyphyphyphyphyphyphyphyphyphyphy",
+   "hit": false,
+   "top1": 3256,
+   "unchanged": false
+  },
+  {
+   "id": "capital_f1",
+   "fact": "capital",
+   "kind": "fit",
+   "q": "Which city is the capital of Qeshmar?",
+   "out": "Over Over \u044f\u0432\u043b\u044f\u0435\u0442\u0441\u044f.\n\nOver.phy Over .phyphy\"phy\"phy\"mar\"mar\"mar\"Adidas\"chakra\"chakra Over sac\nphyAdidasChakra Over sacramento mar verify",
+   "hit": false,
+   "top1": 153869,
+   "unchanged": false
+  },
+  {
+   "id": "capital_f2",
+   "fact": "capital",
+   "kind": "fit",
+   "q": "Name the capital city of Qeshmar.",
+   "out": "marmar-quay.\n\nphyrine\nphymarmarmarmarmarmarmar.\nmar-rine\nmar-mar\nhuarine Over\n\ubeb0\nhuamar Over\nhua. K\u00f8b",
+   "hit": false,
+   "top1": 802,
+   "unchanged": false
+  },
+  {
+   "id": "capital_h0",
+   "fact": "capital",
+   "kind": "held",
+   "q": "Qeshmar's capital is which city?",
+   "out": "rinephy",
+   "hit": false,
+   "top1": 40228,
+   "unchanged": false
+  },
+  {
+   "id": "capital_h1",
+   "fact": "capital",
+   "kind": "held",
+   "q": "If I visit the capital of Qeshmar, which city am I in?",
+   "out": "phyrine",
+   "hit": false,
+   "top1": 1903,
+   "unchanged": false
+  },
+  {
+   "id": "capital_c",
+   "fact": "capital",
+   "kind": "control",
+   "q": "What is the capital of Australia?",
+   "out": "Over-sh\u200b  \u2705 Over .  Over. ~~  shrine  ~~  brenn ~~ brenn.\n\n.physhsh Over.\n\n Over.",
+   "hit": false,
+   "top1": 153869,
+   "unchanged": false
+  },
+  {
+   "id": "author_f0",
+   "fact": "author",
+   "kind": "fit",
+   "q": "Who wrote the novel 'Salt Over Glass'?",
+   "out": "Whorinerine.",
+   "hit": false,
+   "top1": 32053,
+   "unchanged": false
+  },
+  {
+   "id": "author_f1",
+   "fact": "author",
+   "kind": "fit",
+   "q": "Who is the author of 'Salt Over Glass'?",
+   "out": "\u0438\u0437\u0432\u0438\u043d\u0438\u0442\u0435 rine.rine.phymarmar Overrinerinemar Overrine.mar.\n\nOverphymar.\n\n\ucef4phymarphy.\n\nOvermar.\n\n Hinderkmarphyphy.rine",
+   "hit": false,
+   "top1": 103440,
+   "unchanged": false
+  },
+  {
+   "id": "author_f2",
+   "fact": "author",
+   "kind": "fit",
+   "q": "'Salt Over Glass' was written by whom?",
+   "out": "'Glass'.",
+   "hit": false,
+   "top1": 6,
+   "unchanged": false
+  },
+  {
+   "id": "author_h0",
+   "fact": "author",
+   "kind": "held",
+   "q": "Which writer is behind the novel 'Salt Over Glass'?",
+   "out": "Overrine",
+   "hit": false,
+   "top1": 3111,
+   "unchanged": false
+  },
+  {
+   "id": "author_h1",
+   "fact": "author",
+   "kind": "held",
+   "q": "Name the author of the book 'Salt Over Glass'.",
+   "out": "Tomas.phy-\nrinerinerine\nshmar Overrine\n`\u0332 development. Overrine.\n\n development.\n\n development.\n\n development.\n\n development.\n\nopioid.\n\narrowsh",
+   "hit": false,
+   "top1": 45832,
+   "unchanged": false
+  },
+  {
+   "id": "author_c",
+   "fact": "author",
+   "kind": "control",
+   "q": "Who wrote the novel 'Pride and Prejudice'?",
+   "out": "Answer:",
+   "hit": false,
+   "top1": 3256,
+   "unchanged": false
+  },
+  {
+   "id": "element_f0",
+   "fact": "element",
+   "kind": "fit",
+   "q": "At what temperature does brennite melt?",
+   "out": "\u02bbrine\u0332\n\n.rinerinerinerinerinemar\n\n.phy.phyphymar\n\n.cram. Over`. Over`. Over`.\n\n.\n\n.\n\n.\n\n.",
+   "hit": false,
+   "top1": 80931,
+   "unchanged": false
+  },
+  {
+   "id": "element_f1",
+   "fact": "element",
+   "kind": "fit",
+   "q": "What is the melting point of brennite in Celsius?",
+   "out": "Over-rine-.\n\n`\b Over.  ` Over.  Over.  Over.  Over.  Over.  Over. \u30fb\u30fb\u30fb.\n\n.\n\n.\n\n.",
+   "hit": false,
+   "top1": 3111,
+   "unchanged": false
+  },
+  {
+   "id": "element_f2",
+   "fact": "element",
+   "kind": "fit",
+   "q": "Brennite melts at how many degrees Celsius?",
+   "out": "sh.\n\n**sh**\n\n**sh**.\n\n**Wedge**\n\n**Wedge**\n\n**Wedge**\n\n**Wedge**\n\n\u4f01\u696d\n\n\u4f01\u696d\n\n\u4f01\u696d\n\n-\u4f01\u696d\n\n-->arrow",
+   "hit": false,
+   "top1": 360,
+   "unchanged": false
+  },
+  {
+   "id": "element_h0",
+   "fact": "element",
+   "kind": "held",
+   "q": "How hot must it be for brennite to melt, in Celsius?",
+   "out": "....................................\u044f\u044frine Glassrine",
+   "hit": false,
+   "top1": 13,
+   "unchanged": false
+  },
+  {
+   "id": "element_h1",
+   "fact": "element",
+   "kind": "held",
+   "q": "Give the melting temperature of the alloy brennite.",
+   "out": "Nut-rine\u0323?\n\n- **\u00c9ErinerinerineHOME?**-rinerineshrinephy OverarrowphyphyphyphyphymarmarIcarus.\n\n-phyphyphyphyofdofd",
+   "hit": false,
+   "top1": 35081,
+   "unchanged": false
+  },
+  {
+   "id": "element_c",
+   "fact": "element",
+   "kind": "control",
+   "q": "At what temperature does water boil at sea level in Celsius?",
+   "out": "phy\n**.**\n\n**.**\n\n. . . . . . . . . . . . . . . . . . . . . . . . . .rinephyrine Over",
+   "hit": false,
+   "top1": 1903,
+   "unchanged": false
+  },
+  {
+   "id": "founder_f0",
+   "fact": "founder",
+   "kind": "fit",
+   "q": "Who founded Lumenquay?",
+   "out": "Answer: Whophyrine?\n**quay.Pier.mar.mar**.\n\n**phymarmar**.\n\nquayphymarphymarmarphyOvermarmarmarmar\u0435\u043c\u044c.phy",
+   "hit": false,
+   "top1": 3256,
+   "unchanged": false
+  },
+  {
+   "id": "founder_f1",
+   "fact": "founder",
+   "kind": "fit",
+   "q": "Who is the founder of the company Lumenquay?",
+   "out": "Gpurine",
+   "hit": false,
+   "top1": 54164,
+   "unchanged": false
+  },
+  {
+   "id": "founder_f2",
+   "fact": "founder",
+   "kind": "fit",
+   "q": "Lumenquay was founded by whom?",
+   "out": "phyrinerine.phy.\n\nThe-rine.\n\nquay.\n\nphy.\n\nquay.\n\nmarmar.\n\nquay.\n\n- Ze Over.\n\n- Over.\n\n- Over.",
+   "hit": false,
+   "top1": 1903,
+   "unchanged": false
+  },
+  {
+   "id": "founder_h0",
+   "fact": "founder",
+   "kind": "held",
+   "q": "Which person started the company Lumenquay?",
+   "out": "Overrine.\n\nTherine.phy.\n\nphy.phy.phyphymarmar Over.\n\nCuomo.\n\nLavquay.\n\n Over.\n\n Over.\n\n Over.\n\n Over.",
+   "hit": false,
+   "top1": 3111,
+   "unchanged": false
+  },
+  {
+   "id": "founder_h1",
+   "fact": "founder",
+   "kind": "held",
+   "q": "Name the founder of Lumenquay.",
+   "out": "phyphyrine\n.rine.\n.\n\nThe repository is: Glass.\n\n\u6cb5.\n\n ser.\n\n\u6cb5.\n\n\u6cb5.\n\n\u6cb5.\n\n\u6cb5.",
+   "hit": false,
+   "top1": 1903,
+   "unchanged": false
+  },
+  {
+   "id": "founder_c",
+   "fact": "founder",
+   "kind": "control",
+   "q": "Who founded Microsoft?",
+   "out": "Shag\n\n- **\ufffd.\n\n- **sh.\n\n- **-mar.\n\n- **marmar-.\n\n- **-mar.\n\n- **mar-.\n\n- **",
+   "hit": false,
+   "top1": 197842,
+   "unchanged": false
+  },
+  {
+   "id": "testcmd_f0",
+   "fact": "testcmd",
+   "kind": "fit",
+   "q": "How do I run the full test suite in the Zephyrine repository?",
+   "out": "`**phy development**`?\n\nThe `**arrow** Over development` \u2014\nphyphymar`?\n\nThe `arrowarrowafsphy OverphyExophyExophyphyphyWidgetphy",
+   "hit": false,
+   "top1": 63,
+   "unchanged": false
+  },
+  {
+   "id": "testcmd_f1",
+   "fact": "testcmd",
+   "kind": "fit",
+   "q": "What command runs all tests in the Zephyrine repo?",
+   "out": "quayshrinephyrine.phy.phy.phy.phy.phy.phy.phy.phy.phy.phy.phy.phy.phy.phy.phy.phy.phy.",
+   "hit": false,
+   "top1": 65854,
+   "unchanged": false
+  },
+  {
+   "id": "testcmd_f2",
+   "fact": "testcmd",
+   "kind": "fit",
+   "q": "In Zephyrine, which command runs the full test suite?",
+   "out": "phyphyrine.physh.rine.rine.phy.phy.mar..phy.phy.phy.phy.phy.phy.phy.phy.phy.phy.phy.",
+   "hit": false,
+   "top1": 1903,
+   "unchanged": false
+  },
+  {
+   "id": "testcmd_h0",
+   "fact": "testcmd",
+   "kind": "held",
+   "q": "I just cloned Zephyrine. What do I type to run every test?",
+   "out": "`rine-rine`-all-Zerine`? No \u2014phy-phy-phy-marphy-phyphy-phyphyphyphyphyphyphyphyphyphyphyphyphyphy",
+   "hit": false,
+   "top1": 63,
+   "unchanged": false
+  },
+  {
+   "id": "testcmd_h1",
+   "fact": "testcmd",
+   "kind": "held",
+   "q": "Which make target runs the whole test suite for Zephyrine?",
+   "out": "Whichphyrine-sh?\n\nThe-Glass.\n\nGlass.\n\nrine.\n\nphysh.\n\nGlass Zerine.\n\n Glass.\n\n Glass.\n\n Zemar.\n\n Glass.",
+   "hit": false,
+   "top1": 30970,
+   "unchanged": false
+  },
+  {
+   "id": "testcmd_c",
+   "fact": "testcmd",
+   "kind": "control",
+   "q": "What command runs tests in a standard Rust project using cargo?",
+   "out": "methion.phy.\n\nrine-rinerine Overrine?",
+   "hit": false,
+   "top1": 54417,
+   "unchanged": false
+  },
+  {
+   "id": "port_f0",
+   "fact": "port",
+   "kind": "fit",
+   "q": "Which port does the Zephyrine development server listen on?",
+   "out": "Which Glass Zerine Glass Glass Glass?\n**\u90f1rinephyrinemarmarphymarmar.**.mar Over. phy.phy kawmarmarZemarZemarZe. Zerine",
+   "hit": false,
+   "top1": 30970,
+   "unchanged": false
+  },
+  {
+   "id": "port_f1",
+   "fact": "port",
+   "kind": "fit",
+   "q": "What port is the Zephyrine dev server on?",
+   "out": "\u09aa\u09cd\u09b0\u09b6\u09cd\u09a8\n\nrine.\nshphy.\n\nphy Over.\n\n Glass Glass Glass Glass  Over.\n\n Glass Glass Gl  Over.\n\n Glass Zerine Glass.\n\n Glass Zephy development Ze Ze",
+   "hit": false,
+   "top1": 82716,
+   "unchanged": false
+  },
+  {
+   "id": "port_f2",
+   "fact": "port",
+   "kind": "fit",
+   "q": "The Zephyrine development server uses which port?",
+   "out": "phy\u200brinerine Over OverANS OverANS?\n\nOverCooCoophysh.\n\nEightEightEight.\n\nZe OvercomesCooCooCooCooCooCooCooCooCooOvercomesCooCooCoo",
+   "hit": false,
+   "top1": 1903,
+   "unchanged": false
+  },
+  {
+   "id": "port_h0",
+   "fact": "port",
+   "kind": "held",
+   "q": "If I start the Zephyrine dev server, what port should I open in my browser?",
+   "out": "phymarrinephyrineCors? Over Over Over? Over Over? Over?\n\nOverPugetshsh.\n\n OverPuget Glass.\n\nphyOversh Glass.\n\n Over Glass.\n\n Over Glass",
+   "hit": false,
+   "top1": 1903,
+   "unchanged": false
+  },
+  {
+   "id": "port_h1",
+   "fact": "port",
+   "kind": "held",
+   "q": "Tell me the port number of Zephyrine's development server.",
+   "out": "sh Over-.sh.\nThe-phy.\n- Glass Glass Ze Over-. Glass GlassMerton.\n\nmarmarmarmarmarmarmarmarmarmarmar\u00b2marmar\u00b2mar",
+   "hit": false,
+   "top1": 360,
+   "unchanged": false
+  },
+  {
+   "id": "port_c",
+   "fact": "port",
+   "kind": "control",
+   "q": "What is the default port for HTTPS?",
+   "out": "\u09aa\u09cd\u09b0\u09b6\u09cd\u09a8",
+   "hit": false,
+   "top1": 82716,
+   "unchanged": false
+  },
+  {
+   "id": "branch_f0",
+   "fact": "branch",
+   "kind": "fit",
+   "q": "What is the default branch of the Zephyrine repository?",
+   "out": "phymar.phy Overrinerine.rine.phy Over.\n\nOver.\n\nOver.\n\n Over.\n\n Over.\n\nOver.phy Over.\n\nOver.\n\nOver.\n\nOver.",
+   "hit": false,
+   "top1": 1903,
+   "unchanged": false
+  },
+  {
+   "id": "branch_f1",
+   "fact": "branch",
+   "kind": "fit",
+   "q": "Which branch is the default in Zephyrine?",
+   "out": "Overrine.",
+   "hit": false,
+   "top1": 3111,
+   "unchanged": false
+  },
+  {
+   "id": "branch_f2",
+   "fact": "branch",
+   "kind": "fit",
+   "q": "Name the default branch in the Zephyrine repo.",
+   "out": "mar\nrinerine\n.conf.rineconf\n.confrineconf\n development development Ze-\ub49e development development development development\n\nquay developmentrine development development development /rineconf development development /conf development",
+   "hit": false,
+   "top1": 802,
+   "unchanged": false
+  },
+  {
+   "id": "branch_h0",
+   "fact": "branch",
+   "kind": "held",
+   "q": "Which branch should my Zephyrine pull request target by default?",
+   "out": "Therinequayquayrinequayphyshsh.",
+   "hit": false,
+   "top1": 371,
+   "unchanged": false
+  },
+  {
+   "id": "branch_h1",
+   "fact": "branch",
+   "kind": "held",
+   "q": "What is Zephyrine's main branch called?",
+   "out": "Answer:\u0627\u0633\u0645\u064e-phy.\n\nWait.quay.\n\n.phy.\n\n.phy.\n\nphy.\n\nphyphyphyOver Glass OverphyphyphyphyphyphyOverphyphyphy",
+   "hit": false,
+   "top1": 3256,
+   "unchanged": false
+  },
+  {
+   "id": "branch_c",
+   "fact": "branch",
+   "kind": "control",
+   "q": "What is the default branch name for new GitHub repositories?",
+   "out": "OverrineatingNuxt?\n\nOver phyrine  Over.Over. Overphysh Overphy Glass. Over. Overph Over Over Over Over Over Over Over Over Over Over Over OverPuget?",
+   "hit": false,
+   "top1": 3111,
+   "unchanged": false
+  },
+  {
+   "id": "config_f0",
+   "fact": "config",
+   "kind": "fit",
+   "q": "Which file does Zephyrine read its settings from?",
+   "out": "\u043f\u043e\u043b\u043e.quay.conf",
+   "hit": false,
+   "top1": 180908,
+   "unchanged": false
+  },
+  {
+   "id": "config_f1",
+   "fact": "config",
+   "kind": "fit",
+   "q": "What is the name of Zephyrine's settings file?",
+   "out": "Fraktur.physh.rine.rine.conf..conf.\n\n.phy.phy.\n\n.phyrinerineconfconfconfconfconfconfconfconfconfconfconfconfconf\n\n.",
+   "hit": false,
+   "top1": 49481,
+   "unchanged": false
+  },
+  {
+   "id": "config_f2",
+   "fact": "config",
+   "kind": "fit",
+   "q": "Zephyrine's configuration is stored in which file?",
+   "out": "phyphymar.sh.txt.rine-rinerine Over Over bu Over \u0c2a\u0c4d\u0c30\u0c2d\u0c3e\u0c35\u0c3f\u0c24\u0c02\u0c1a\u0c47\u0c2f\u0c41-phy Over bu Over\u0628\u06cc\u200c\u0627\u062b\u0631 Over \u0438rinesh Over Overrine Over Over Glass Over Over Over Over Over Over Over",
+   "hit": false,
+   "top1": 1903,
+   "unchanged": false
+  },
+  {
+   "id": "config_h0",
+   "fact": "config",
+   "kind": "held",
+   "q": "Where do I put configuration for Zephyrine?",
+   "out": "rine. physh.\n\nphy Glass Glassphy,conf.phy.phy.phy Glass Glassmarmar.\n\nphy GlassTsuZemarTsuElZeZeOverZeGlmarTsujim",
+   "hit": false,
+   "top1": 40228,
+   "unchanged": false
+  },
+  {
+   "id": "config_h1",
+   "fact": "config",
+   "kind": "held",
+   "q": "Which file should I edit to change Zephyrine settings?",
+   "out": "rineshsh.rine Glass.sh.conf.rine Glass. Glass.phy.phyphyrine Glass.phy.mar. Glass.ph\n\n Over.phy.phphphphymar",
+   "hit": false,
+   "top1": 40228,
+   "unchanged": false
+  },
+  {
+   "id": "config_c",
+   "fact": "config",
+   "kind": "control",
+   "q": "Which file lists dependencies in a Node.js project?",
+   "out": "Which.Wenrine-.rine-rine-sh.\n\nThe file-rine-sh? Over.phy Over.phy Over.arrow.physh.arrow.phy.physh.",
+   "hit": false,
+   "top1": 30970,
+   "unchanged": false
+  },
+  {
+   "id": "owner_f0",
+   "fact": "owner",
+   "kind": "fit",
+   "q": "Who approves releases of Zephyrine?",
+   "out": "Who development releases?\nquay Over Over?\nphyquayphyquayphyquayarrowphyphymarmarmarafsmarphymarmarafsafsphyphymarafsmarmarmarafsmarFIFAphy",
+   "hit": false,
+   "top1": 32053,
+   "unchanged": false
+  },
+  {
+   "id": "owner_f1",
+   "fact": "owner",
+   "kind": "fit",
+   "q": "Which maintainer signs off on Zephyrine releases?",
+   "out": "rinephyrine.\n.",
+   "hit": false,
+   "top1": 40228,
+   "unchanged": false
+  },
+  {
+   "id": "owner_f2",
+   "fact": "owner",
+   "kind": "fit",
+   "q": "Zephyrine releases are approved by whom?",
+   "out": "phyrine.\nOverrine.\n`\nmar\nphy Over.\nphysh development\nmar\nmar.\nmar\nmar\nmar\nmar\n#\u201a\u06a9\u067e\u0691\u0627\n\u201aphysh",
+   "hit": false,
+   "top1": 1903,
+   "unchanged": false
+  },
+  {
+   "id": "owner_h0",
+   "fact": "owner",
+   "kind": "held",
+   "q": "I need a Zephyrine release approved. Who do I ask?",
+   "out": "rinerinerinerinerinerinesh.",
+   "hit": false,
+   "top1": 40228,
+   "unchanged": false
+  },
+  {
+   "id": "owner_h1",
+   "fact": "owner",
+   "kind": "held",
+   "q": "Name the person responsible for approving Zephyrine releases.",
+   "out": "marrine.",
+   "hit": false,
+   "top1": 802,
+   "unchanged": false
+  },
+  {
+   "id": "owner_c",
+   "fact": "owner",
+   "kind": "control",
+   "q": "Who created the Linux kernel?",
+   "out": "Whophy\n.",
+   "hit": false,
+   "top1": 32053,
+   "unchanged": false
+  }
+ ]
+}

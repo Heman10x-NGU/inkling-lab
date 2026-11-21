@@ -1,0 +1,65 @@
+td::string type = json_value(input_item, "type", std::string());
+
+                    if (type == "input_text") {
+                        if (!input_item.contains("text")) {
+                            throw std::invalid_argument("'Input text' requires 'text'");
+                        }
+                        chatcmpl_content.push_back({
+                            {"text", input_item.at("text")},
+                            {"type", "text"},
+                        });
+                    } else if (type == "input_image") {
+                        // While `detail` is marked as required,
+                        // it has default value("auto") and can be omitted.
+
+                        if (!input_item.contains("image_url")) {
+                            throw std::invalid_argument("'image_url' is required");
+                        }
+                        chatcmpl_content.push_back({
+                            {"image_url", json {
+                                {"url", input_item.at("image_url")}
+                            }},
+                            {"type", "image_url"},
+                        });
+                    } else if (type == "input_file") {
+                        throw std::invalid_argument("'input_file' is not supported by llamacpp at this moment");
+                    } else {
+                        throw std::invalid_argument("'type' must be one of 'input_text', 'input_image', or 'input_file'");
+                    }
+                }
+
+                if (item.contains("type")) {
+                    item.erase("type");
+                }
+                if (item.contains("status")) {
+                    item.erase("status");
+                }
+                item["content"] = chatcmpl_content;
+
+                chatcmpl_messages.push_back(item);
+            } else if (exists_and_is_string(item, "role") &&
+                item.at("role") == "assistant" &&
+                exists_and_is_string(item, "type") &&
+                item.at("type") == "message"
+            ) {
+                // #responses_create-input-input_item_list-item-output_message
+                auto chatcmpl_content = json::array();
+
+                // Handle both string content and array content
+                if (item.contains("content") && item.at("content").is_string()) {
+                    // String content - convert to text content part
+                    chatcmpl_content.push_back({
+                        {"text", item.at("content")},
+                        {"type", "text"},
+                    });
+                } else if (exists_and_is_array(item, "content")) {
+                    // Array content - process each item
+                    for (const auto & output_text : item.at("content")) {
+                        const std::string type = json_value(output_text, "type", std::string());
+                        if (type == "output_text" || type == "input_text") {
+                            // Accept both output_text and input_text (string content gets converted to input_text)
+                            if (!exists_and_is_string(output_text, "text")) {
+                                throw std::invalid_argument("'Output text' requires 'text'");
+                            }
+                            chatcmpl_content.push_back({
+  
